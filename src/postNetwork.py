@@ -1,45 +1,67 @@
 from collections import defaultdict
 
 epsilon0 = 0.25
+nextPostId = 0
 
-class postNetwork:
+class Post:
+
+    def __init__(self, entities, id=False, timeStamp="", author=""):
+        global nextPostId
+        self.entities = entities
+        self.timeStamp = timeStamp
+        self.author = author
+        self.weight = 0
+        if id is False:
+            self.id = nextPostId
+            nextPostId += 1
+        else:
+            self.id = id
+    
+        
+
+class PostNetwork:
     
     def __init__ (self):
-        self.postDict = defaultdict(list)
+        self.posts = []
         self.entityDict = defaultdict(list)
         self.graph = defaultdict(list)
-        self.hittingCount = []
+        self.sketchGraph = defaultdict(list)
 
-    def addEdge (self, post, noun):
-        self.postDict[post].append(noun)
-        self.entityDict[noun].append(post)
+    def addPost(self, post):
+        self.posts.append(post)
+        for noun in post.entities:
+            self.entityDict[noun].append(post)
 
-    def updateSimilarity(self, post):
-        similarity = [0]*post
-        for word in self.postDict[post]:
+    def getPost(self, id):
+        for post in self.posts:
+            if post.id == id:
+                return post
+        return None
+    
+    def updateSimilarity(self, newPost):
+        postId = newPost.id
+        similarity = [0]*(postId+1)
+        for word in self.posts[postId].entities:
             for posts in self.entityDict[word]:
-                similarity[posts-1] += 1
-        self.hittingCount.append(similarity)
-        entityPost = postGraph.hittingCount[post-1][post-1]
-        for posts in range(post-1):
-            entityPost2 = postGraph.hittingCount[posts][posts]
-            common = postGraph.hittingCount[post-1][posts]
-            sim = common/(entityPost+entityPost2-common)
+                similarity[posts.id] += 1
+        for posts in range(postId-1):
+            prevPost = self.getPost(posts)
+            sim = similarity[posts]/(len(newPost.entities)+len(prevPost.entities)-similarity[posts])
             if sim >= epsilon0:
-                self.graph[post].append([posts+1, sim])
-                self.graph[posts+1].append([post, sim])
+                self.graph[postId].append([posts+1, sim])
+                self.graph[posts+1].append([postId, sim])
+                newPost.weight += sim
+                prevPost.weight += sim
         
 
 
-postGraph = postNetwork()
-file = open("filtered_tags.txt", 'r').read().split('\n')
-postCount = 0
+postGraph = PostNetwork()
+file = open('../filtered_tweets.txt', 'r').read().split('\n')
 for line in file:
     line = line.strip()
-    postCount += 1
+    if nextPostId % 100 == 0:
+        print(f"Loaded {nextPostId} tweets")
     entities = line.split(' ')
-    for entity in entities:
-        postGraph.addEdge(postCount, entity)
-    postGraph.updateSimilarity(postCount)
-
-# print(postGraph.graph)
+    newPost = Post(entities)
+    postGraph.addPost(newPost)
+    postGraph.updateSimilarity(newPost)
