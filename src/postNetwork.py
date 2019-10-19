@@ -9,6 +9,7 @@ delta1 = 0.5
 NEXT_POST_ID = 0
 NEXT_CLUSTER_ID = 0
 SLIDING_WINDOW = 500 #not implemented
+TIME_STEP = 10
 
 
 def fad_sim(a,b):
@@ -31,21 +32,22 @@ class Post:
             self.id = id
         self.state = None
         self.type = ''
-        self.clusId = -1
+        self.clusId = set()
 
 class PostNetwork:
     
     def __init__ (self):
-        self.posts = []
-        self.corePosts = []
-        self.borderPosts = []
-        self.noise = []
+        self.posts = list()
+        self.corePosts = list()
+        self.borderPosts = list()
+        self.noise = list()
         self.entityDict = defaultdict(list)
         self.graph = defaultdict(list)
         self.sketchGraph = defaultdict(list)
         self.clusters = defaultdict(list)
-        self.S0 = []
-        self.Sn = []
+        self.S0 = list()
+        self.Sn = list()
+        self.currTime = 0
 
 
     def addPost(self, post):
@@ -61,10 +63,9 @@ class PostNetwork:
         return None
 
     def endTimeStep(self, currTime):
-        ########TODO: Decrease weights for posts outside slider
+        global NEXT_CLUSTER_ID, TIME_STEP
         ########## S0 and Sn only have core posts
-        self.corePosts = []
-        S0, S_, Sn, S_pl = [],[],[],[]
+        S_, S_pl = list(),list()
 
         ## Checking for core->noncore posts
         for i,post in enumerate(self.corePosts):
@@ -86,34 +87,36 @@ class PostNetwork:
                 del self.noise[i]
                 S_pl.append(post)
 
-        ## Check for neew border posts
+        ## Check for new border posts
+        self.corePosts += self.Sn
         self.corePosts += S_pl
-        for post in S_pl:
+        for post in S_pl+self.Sn:
             for neiPost,_ in self.graph[post]:
-                if post.type != 'Core':
+                if post.type == 'Noise':
+                    self.noise.remove(neiPost)
                     post.type = 'Border'
                     self.borderPosts.append(neiPost)
         for post in S_:
             for neiPost,_ in self.graph[post]:
                 if neiPost.type != 'Core':
                     if not 'Core' in [x.type for x,_ in self.graph[neiPost]]:
+                        # Shouldn't be a borderpost
                         if neiPost.type == 'Border':
                             self.borderPosts.remove(neiPost)
                         neiPost.type = 'Noise'
                         self.noise.append(neiPost)
-                        ### Remove from borderPosts if there
                     else:
-                        ### Dont add if there
+                        # Should be a borderpost
                         if neiPost.type != 'Border':
+                            self.noise.remove(neiPost)
                             self.borderPosts.append(neiPost)
                             neiPost.type = 'Border'
 
         neg_C = set()
-        for post in S0+S_:
+        for post in self.S0+S_:
             for neiPost,we in self.graph[post]:
-                if neiPost.type == 'Core' and we >= epsilon1 and (not neiPost in S0+S_):
-                    neg_C.add(neiPost.clusId)
-        ###TODO: shld consider border posts in multple clus
+                if neiPost.type == 'Core' and we >= epsilon1:# Should we check if conn is core conn also?
+                    neg_C.add(next(iter(neiPost.clusId)))# Gives element from a set
         if len(neg_C) == 0:
             return
         elif len(neg_C) == 1:
@@ -122,43 +125,43 @@ class PostNetwork:
             return
 
         pos_C = set()
-        for post in Sn+S_pl:
+        for post in self.Sn+S_pl:
             for neiPost,we in self.graph[post]:
-                if neiPost.type == 'Core' and we >= epsilon1 and (not neiPost in Sn+S_pl):
-                    pos_C.add(neiPost.clusId)
+                if neiPost.type == 'Core' and we >= epsilon1:# Should we check if conn is core conn also?
+                    pos_C.add(next(iter(neiPost.clusId)))
 
         if len(pos_C) == 0:
-            newClus = Sn + S_pl
-            for post in Sn+S_pl:
+            newClus = self.Sn + S_pl
+            for post in self.Sn+S_pl:
                 for neiPost,we in self.graph[post]:
-                    if we >= epsilon0 and (not neiPost in Sn+S_pl):
-                        newClus.add(neiPost)
-                        ###TODO: Border posts can be in multiple clus
-                        neiPost.clusId = NEXT_CLUSTER_ID
-                post.clusId = NEXT_CLUSTER_ID
+                    newClus.append(neiPost)
+                    neiPost.clusId.add(NEXT_CLUSTER_ID)
+                post.clusId.add(NEXT_CLUSTER_ID)
             self.clusters[NEXT_CLUSTER_ID] = newClus
             NEXT_CLUSTER_ID += 1
         elif len(pos_C) == 1:
             cid = pos_C.pop()
-            for post in Sn+S_pl:
+            for post in self.Sn+S_pl:
                 for neiPost,we in self.graph[post]:
-                    if we >= epsilon0 and (not neiPost in Sn+S_pl):
+                    if we >= epsilon0 and (not neiPost in self.Sn+S_pl):
                         newClus.add(neiPost)
-                        ###TODO: Border posts can be in multiple clus
-                        neiPost.clusId = cid
-                post.clusId = cid
+                        neiPost.clusId.add(cid)
+                post.clusId.add(cid)
         else:
             cid = pos_C.pop()
-            for post in Sn+S_pl:
+            for post in self.Sn+S_pl:
                 for neiPost,we in self.graph[post]:
-                    if we >= epsilon0 and (not neiPost in Sn+S_pl):
+                    if we >= epsilon0 and (not neiPost in self.Sn+S_pl):
                         newClus.add(neiPost)
-                        ###TODO: Border posts can be in multiple clus
                         neiPost.clusId = cid
                 post.clusId = cid
             for oldCid in pos_C:
                 for post in self.clusters[oldCid]:
-                    post.clusId = cid
+                    post.clusId.add(cid)
+                    post.clusId.remove(oldCid)
+        self.Sn.clear()
+        self.S0.clear()
+        self.currTime += TIME_STEP
 
     def startTimeStep(self, curr_time):
         # Delete old posts from self.posts and update weights, store in other array
@@ -166,6 +169,11 @@ class PostNetwork:
             if curr_time - post.timeStamp > SLIDING_WINDOW:
                 for neiPost,we in self.graph[post]:
                     neiPost.weight -= we
+                if(post.type == 'Core'): 
+                    self.corePosts.remove(post)
+                    self.S0.append(post)
+                elif(post.type == 'Border'): self.borderPosts.remove(post)
+                elif(post.type == 'Noise'): self.noise.remove(post)
             else:
                 break
         return
@@ -183,8 +191,12 @@ class PostNetwork:
             if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0:
                 self.graph[newPost].append((prevPost,sim))
                 self.graph[prevPost].append((newPost,sim))
-        
-    
+        if newPost.weight/fad_sim(self.currTime,newPost.timeStamp) >= delta1:
+            self.Sn.append(newPost)
+            newPost.type = 'Core'
+        else:
+            newPost.type = 'Noise'
+            self.noise.append(newPost)
 
 
 postGraph = PostNetwork()

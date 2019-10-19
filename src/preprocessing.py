@@ -2,8 +2,8 @@ import pandas as pd
 from subprocess import check_output
 import numpy as np
 
-noun_tags = ['NN', 'NNS', 'NNP']
-DATASET_NAME = './Datasets/CrisisNLP_labeled_data_crowdflower/2013_Pakistan_eq/2013_Pakistan_eq_CF_labeled_data.tsv'
+noun_tags = ['NN', 'NNS', 'NNP', 'NNPS']
+DATASET_NAME = '../Datasets/CrisisNLP_labeled_data_crowdflower/2014_ebola_cf/2014_ebola_CF_labeled_data.tsv'
 FINAL_NAME = DATASET_NAME.split('/')[3]
 
 def snowflake2utcms(sf):
@@ -37,7 +37,7 @@ print(df.head())
 np.savetxt("../untagged_tweets.txt", df.values, fmt='%s')
 
 print('Started tagging all tweets')
-taggerProcess = check_output(["java", "-mx300m", "-classpath", "Taggers/stanford-postagger-2018-10-16/stanford-postagger.jar", "edu.stanford.nlp.tagger.maxent.MaxentTagger", "-model", "Taggers/stanford-postagger-2018-10-16/models/gate-EN-twitter-fast.model", "-textFile", "./untagged_tweets.txt", "-l"])
+taggerProcess = check_output(["java", "-mx300m", "-classpath", "../Taggers/stanford-postagger-2018-10-16/stanford-postagger.jar", "edu.stanford.nlp.tagger.maxent.MaxentTagger", "-model", "../Taggers/stanford-postagger-2018-10-16/models/gate-EN-twitter-fast.model", "-textFile", "../untagged_tweets.txt", "-l"])
 all_tweets = (taggerProcess.decode('utf-8')).split('\n')
 print('Tagged all tweets')
 
@@ -52,5 +52,5 @@ print(df.tail(1))
 df['filt_tweet_text'] = filtered_tweets
 print('Added filtered tweets column')
 #print(df.head())
-df.to_csv(f'./Datasets/PreprocessedData/{FINAL_NAME}.csv', sep='\t', index=False)
+df.to_csv(f'../Datasets/PreprocessedData/{FINAL_NAME}.csv', sep='\t', index=False)
 print('Saved to csv file')
