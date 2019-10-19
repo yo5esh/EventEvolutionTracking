@@ -169,6 +169,8 @@ class PostNetwork:
             if curr_time - post.timeStamp > SLIDING_WINDOW:
                 for neiPost,we in self.graph[post]:
                     neiPost.weight -= we
+                    self.graph[neiPost].remove((post,we))
+                del self.graph[post]
                 if(post.type == 'Core'): 
                     self.corePosts.remove(post)
                     self.S0.append(post)
