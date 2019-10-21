@@ -34,7 +34,10 @@ print('Added timestamps column')
 print(df.head())
 
 # storing in .txt for sending for tagging pos
-np.savetxt("../untagged_tweets.txt", df.values, fmt='%s')
+f = open("../untagged_tweets.txt", 'w')
+f.write("")
+f.close()
+np.savetxt("../untagged_tweets.txt", df[['tweet_text']].values, fmt='%s')
 
 print('Started tagging all tweets')
 taggerProcess = check_output(["java", "-mx300m", "-classpath", "../Taggers/stanford-postagger-2018-10-16/stanford-postagger.jar", "edu.stanford.nlp.tagger.maxent.MaxentTagger", "-model", "../Taggers/stanford-postagger-2018-10-16/models/gate-EN-twitter-fast.model", "-textFile", "../untagged_tweets.txt", "-l"])
@@ -47,10 +50,13 @@ for tweet in all_tweets:
     if tweet != '':
         filtered_tweets.append(getNouns(tweet))
 
-print(len(filtered_tweets))
-print(df.tail(1))
+print(f'Found {len(filtered_tweets)} filtered tweets')
+#print(df.tail(1))
 df['filt_tweet_text'] = filtered_tweets
 print('Added filtered tweets column')
+df.sort_values(by='tweet_timeStamp', inplace=True)
+print('Sorted by timestamps')
 #print(df.head())
 df.to_csv(f'../Datasets/PreprocessedData/{FINAL_NAME}.csv', sep='\t', index=False)
 print('Saved to csv file')
+np.savetxt("../tagged_tweets.txt", df.values, fmt='%s')
