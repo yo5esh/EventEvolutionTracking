@@ -110,20 +110,22 @@ class PostNetwork:
                     self.borderPosts.append(neiPost)
         for post in S_:
             for neiPost,_ in self.graph[post]:
-                if neiPost.type != 'Core':
+                if neiPost.type == 'Border':
                     if not 'Core' in [x.type for x,_ in self.graph[neiPost]]:
                         # Shouldn't be a borderpost
-                        if neiPost.type == 'Border':
-                            self.borderPosts.remove(neiPost)
+                        self.borderPosts.remove(neiPost)
                         neiPost.type = 'Noise'
                         self.noise.append(neiPost)
-                    else:
+        for post in S_pl+self.Sn:
+            for neiPost,_ in self.graph[post]:
+                if neiPost.type == 'Noise':
+                    if 'Core' in [x.type for x,_ in self.graph[neiPost]]:
                         # Should be a borderpost
-                        if neiPost.type == 'Noise':
-                            print('New n -> b ----- ',neiPost.id)
-                            self.noise.remove(neiPost)
-                            self.borderPosts.append(neiPost)
-                            neiPost.type = 'Border'
+                        print('New n -> b ----- ',neiPost.id)
+                        self.noise.remove(neiPost)
+                        self.borderPosts.append(neiPost)
+                        neiPost.type = 'Border'
+
         clus = self.S0+S_
         neg_C = set()
         for post in clus:
