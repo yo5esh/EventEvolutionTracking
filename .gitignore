@@ -1,8 +1,7 @@
 Taggers/
 crisisNLP_word2vec_model/
-OOV_Dict/
-Datasets/
 !Datasets/PreprocessedData/
+Datasets/
 *.zip
 *.tar.*
 *.txt
