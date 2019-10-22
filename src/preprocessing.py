@@ -39,10 +39,15 @@ f.write("")
 f.close()
 np.savetxt("../untagged_tweets.txt", df[['tweet_text']].values, fmt='%s')
 
-print('Started tagging all tweets')
+print('Started tagging all tweets...')
 taggerProcess = check_output(["java", "-mx300m", "-classpath", "../Taggers/stanford-postagger-2018-10-16/stanford-postagger.jar", "edu.stanford.nlp.tagger.maxent.MaxentTagger", "-model", "../Taggers/stanford-postagger-2018-10-16/models/gate-EN-twitter-fast.model", "-textFile", "../untagged_tweets.txt", "-l"])
 all_tweets = (taggerProcess.decode('utf-8')).split('\n')
 print('Tagged all tweets')
+
+oov = pd.read_csv('../OOV_Dict/OOV_Dictionary_V1.0.tsv', error_bad_lines=False, sep='\t', encoding='latin-1', header=None)
+print(oov.head())
+oov = oov.set_index(0).T.to_dict('list')
+print('Loaded OOV...')
 
 # # filtering for nouns
 filtered_tweets = []
