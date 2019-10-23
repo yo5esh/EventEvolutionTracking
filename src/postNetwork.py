@@ -201,7 +201,7 @@ class PostNetwork:
         similarity = defaultdict(lambda : 0)
         for word in newPost.entities:
             for posts in self.entityDict[word.lower()]:
-                similarity[posts] += 1
+                similarity[posts] += 1/len(self.entityDict[word.lower()]
         for prevPost in similarity.keys():
             '''try:
                 sim = similarity[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity[prevPost])
