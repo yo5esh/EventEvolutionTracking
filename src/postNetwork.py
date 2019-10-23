@@ -193,7 +193,7 @@ class PostNetwork:
             else:
                 break
         return
-    
+        
     def random_Walk(self,newPost):
       self.addPost(self,newPost)
       k=len(self.posts)
@@ -274,6 +274,12 @@ class PostNetwork:
         else:
             newPost.type = 'Noise'
             self.noise.append(newPost)
+    def fun(self,delPost):
+        clus_id = set()
+        for post,we in self.graph[delPost]:
+            if post.type == 'Core' :
+                clus_id.add(post.clusId)
+        return len(clus_id)
 
     def printStats(self):
         print('********************************************************')
@@ -303,3 +309,4 @@ for index, row in df.iterrows():
     if NEXT_POST_ID%50 == 0:
         print(f'Processed {NEXT_POST_ID} posts')
         print(row['tweet_timeStamp'], postGraph.currTime + TIME_STEP, row['tweet_timeStamp'] <= postGraph.currTime + TIME_STEP, sep='\n')
+
