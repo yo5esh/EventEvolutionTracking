@@ -196,60 +196,7 @@ class PostNetwork:
                 break
         return
         
-    def random_Walk(self,newPost):
-        k=len(self.posts)
-        n=len(self.entityDict)
-        Mat = np.zeros((k+n,k+n))
-
-        for i in range(k):
-            for j in range(k) :
-                Mat[i][j] = 0
-        for i in range(k+1,k+n):
-            for j in range(k+1,k+n):
-                Mat[i][j] = 0
-
-        i=0
-        j=0
-        for x in self.posts:
-            for y in self.entityDict.keys():
-                if y in x.entities:#error
-                    Mat[i][k+j+1] = 1
-            j=j+1
-            i=i+1
-
-        for i in range(k+1,k+n):
-            for j in range (k):
-                Mat[i][j] = Mat[j][i]
-        
-        #making stochastic(col)
-        count = 0
-        for j in range (k+n):     #double counting
-            for i in range (k+1,k+n):
-                if Mat[i][j] == 1:
-                    count=count+1
-            if count : 
-                for i in range (k+1,k+n):
-                    Mat[i][j] = 1/count
-            count=0  
-
-        Q,V=[],[]
-        c = 0.5
-        for i in range (k-1):
-            V.append(1/k)
-            Q.append(1/k)
-        V.append(1/k)
-        Q.append(0)  
-        for i in range (k+1,k+n):
-            V.append(0)
-            Q.append(0) 
-        V = np.array([V])
-        Q = np.array([Q])
-        Mat = np.array(Mat)
-        for i in range (20):
-            V = (1-c)*Mat.dot(V) + c*Q
-
-
-
+    
     def updateConns(self, newPost):
         similarity = defaultdict(lambda : 0)
         for word in newPost.entities:
