@@ -5,12 +5,12 @@ from datetime import timedelta
 import pandas as pd
 import numpy as np
 
-epsilon0 = 0.0025
-epsilon1 = 0.004
-delta1 = 0.008
+epsilon0 = 0.055
+epsilon1 = 0.07
+delta1 = 0.08
 NEXT_POST_ID = 0
 NEXT_CLUSTER_ID = 0
-SLIDING_WINDOW = 1000000 #not implemented
+SLIDING_WINDOW = 1000000
 TIME_STEP = 540000
 LAMBDA = 200 # Without this we encounter overflow in fad_sim function
 
@@ -197,54 +197,56 @@ class PostNetwork:
         return
         
     def random_Walk(self,newPost):
-      self.addPost(self,newPost)
-      k=len(self.posts)
-      n=len(self.entityDict)
+        k=len(self.posts)
+        n=len(self.entityDict)
+        Mat = np.zeros((k+n,k+n))
 
-      for i in range(k):
-        for j in range(k) :
-          Mat[i][j] = 0
-      for i in range(k+1,k+n):
-        for j in range(k+1,k+n):
-          Mat[i][j] = 0
+        for i in range(k):
+            for j in range(k) :
+                Mat[i][j] = 0
+        for i in range(k+1,k+n):
+            for j in range(k+1,k+n):
+                Mat[i][j] = 0
 
-      i=0
-      j=0
-      for x in self.posts:
-        for y in self.entityDict.keys():
-          if isinstance(y,x.entities):#error
-            Mat[i][k+j+1] = 1
-          j=j+1
-        i=i+1
+        i=0
+        j=0
+        for x in self.posts:
+            for y in self.entityDict.keys():
+                if y in x.entities:#error
+                    Mat[i][k+j+1] = 1
+            j=j+1
+            i=i+1
 
-      for i in range(k+1,k+n):
-        for j in range (k):
-          Mat[i][j] = Mat[j][i]
-    
-      #making stochastic(col)
-      count = 0
-      for j in range (k+n):     #double counting
-        for i in range (k+1,k+n):
-          if Mat[i][j] == 1:
-            count=count+1
-        for i in range (k+1,k+n):
-          Mat[i][j] = 1/count
-        count=0  
+        for i in range(k+1,k+n):
+            for j in range (k):
+                Mat[i][j] = Mat[j][i]
+        
+        #making stochastic(col)
+        count = 0
+        for j in range (k+n):     #double counting
+            for i in range (k+1,k+n):
+                if Mat[i][j] == 1:
+                    count=count+1
+            if count : 
+                for i in range (k+1,k+n):
+                    Mat[i][j] = 1/count
+            count=0  
 
-      Q=[],V=[]
-      for i in range (k-1):
+        Q,V=[],[]
+        c = 0.5
+        for i in range (k-1):
+            V.append(1/k)
+            Q.append(1/k)
         V.append(1/k)
-        Q.append(1/k)
-      V.append(1/k)
-      Q.append(0)  
-      for i in range (k+1,k+n):
-        V.append(0)
-        Q.append(0) 
-      V = np.array([V])
-      Q = np.array([Q])
-      Mat = np.array(Mat)
-      for i in range (20):
-        V = (1-c)*Mat.dot(V) + c*Q
+        Q.append(0)  
+        for i in range (k+1,k+n):
+            V.append(0)
+            Q.append(0) 
+        V = np.array([V])
+        Q = np.array([Q])
+        Mat = np.array(Mat)
+        for i in range (20):
+            V = (1-c)*Mat.dot(V) + c*Q
 
 
 
@@ -312,3 +314,4 @@ for index, row in df.iterrows():
         print(f'Processed {NEXT_POST_ID} posts')
         print(row['tweet_timeStamp'], postGraph.currTime + TIME_STEP, row['tweet_timeStamp'] <= postGraph.currTime + TIME_STEP, sep='\n')
 
+    postGraph.random_Walk(Post(entities=row['filt_tweet_text'].split(' '), timeStamp=row['tweet_timeStamp']))
