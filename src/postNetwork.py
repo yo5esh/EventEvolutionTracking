@@ -291,9 +291,10 @@ class PostNetwork:
         while (not q.empty()) :
             post = q.get()
             for posta,we in self.graph[post]:
-                if not (posta in explore.keys()) :
+                if posta == 'Core' and not(posta in explore.keys()) :
                     explore[posta] = False
                     q.put(posta)
+                    clus_posts.add(posta)
         while (not(len(clus_posts) == 0)) :
             ans+=1
             q.put(clus_posts[0])
@@ -338,3 +339,4 @@ for index, row in df.iterrows():
         print(row['tweet_timeStamp'], postGraph.currTime + TIME_STEP, row['tweet_timeStamp'] <= postGraph.currTime + TIME_STEP, sep='\n')
 
     postGraph.random_Walk(Post(entities=row['filt_tweet_text'].split(' '), timeStamp=row['tweet_timeStamp']))
+
