@@ -278,13 +278,36 @@ class PostNetwork:
         else:
             newPost.type = 'Noise'
             self.noise.append(newPost)
-    def fun(self,delPost):
-        clus_id = set()
+    def nc_p0(self,delPost):
+        ans = 0
+        clus_posts = list()
+        q = queue.Queue()
+        explore = dict()
         for post,we in self.graph[delPost]:
             if post.type == 'Core' :
-                clus_id.add(post.clusId)
-        return len(clus_id)
-
+                clus_posts.add(post)
+                q.put(post)
+                explore[post] = False
+        while (not q.empty()) :
+            post = q.get()
+            for posta,we in self.graph[post]:
+                if not (posta in explore.keys()) :
+                    explore[posta] = False
+                    q.put(posta)
+        while (not(len(clus_posts) == 0)) :
+            ans+=1
+            q.put(clus_posts[0])
+            explore[clus_posts[0]] = True
+            clus_posts.pop(0)
+            while (not q.empty()) :
+                post = q.get()
+                for posta,we in self.graph[post]:
+                    if not (posta == delPost) and posta.type == 'Core' and explore[posta] == False :
+                        q.put(posta)
+                        explore[posta] = True
+                        clus_posts.remove(posta)
+        return ans
+    
     def printStats(self):
         print('********************************************************')
         print(self.currTime)
