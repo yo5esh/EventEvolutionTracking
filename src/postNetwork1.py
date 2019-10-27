@@ -49,7 +49,7 @@ class PostNetwork:
         self.entityDict = defaultdict(list)
         self.graph = defaultdict(list)
         self.sketchGraph = defaultdict(list)
-        self.clusters = defaultdict(list)
+        self.clusters = defaultdict(set)
         self.S0 = list()
         self.Sn = list()
         self.currTime = 0
@@ -113,40 +113,59 @@ class PostNetwork:
             return
         else:
             return'''
-
+        
         pos_C = set()
-        for post in self.Sn+S_pl:
-            for neiPost,we in self.graph[post]:
-                if neiPost.type == 'Core' and we >= epsilon1 and len(neiPost.clusId):# Should we check if conn is core conn also?
-                    pos_C.add(next(iter(neiPost.clusId)))
-
-        if len(pos_C) == 0:
-            newClus = self.Sn + S_pl
-            for post in self.Sn+S_pl:
-                for neiPost,we in self.graph[post]:
-                    newClus.append(neiPost)
-                    neiPost.clusId.add(NEXT_CLUSTER_ID)
-                post.clusId = set([NEXT_CLUSTER_ID])
-            self.clusters[NEXT_CLUSTER_ID] = newClus
-            NEXT_CLUSTER_ID += 1
-        elif len(pos_C) == 1:
-            cid = pos_C.pop()
-            for post in self.Sn+S_pl:
-                for neiPost,we in self.graph[post]:
-                    self.clusters[cid].append(post)
-                    neiPost.clusId.add(cid)
-                post.clusId = set([NEXT_CLUSTER_ID])
-        else:
-            cid = pos_C.pop()
-            for post in self.Sn+S_pl:
-                for neiPost,we in self.graph[post]:
-                    self.clusters[cid].append(neiPost)
-                    neiPost.clusId.add(cid)
-                post.clusId = set([cid])
-            for oldCid in pos_C:
-                for post in self.clusters[oldCid]:
-                    post.clusId.remove(oldCid)
+        S_temp = set(self.Sn+S_pl)
+        explore = dict()
+        for post in S_temp :
+            explore[post] = True
+        while len(S_temp) :
+            connected = list()
+            posta = S_temp.pop()
+            connected.append(posta)
+            q = queue.Queue()
+            q.add(posta)
+            explore[posta] = False
+            while (not(q.empty())) :
+                post = q.get()
+                for neiPost,we in self.graph[post] :
+                    if neiPost.type == 'Core' :
+                        if len(neiPost.clusId) :
+                            pos_C.add(next(iter(neiPost.clusId)))
+                        elif explore[neiPost] :
+                            explore[neiPost] = False
+                            q.add(neiPost)
+                            connected.append(neiPost)
+            S_temp = S_temp - set(connected)
+            if len(pos_C) == 0:
+                newClus = set(connected)
+                for post in connected :
+                    for neiPost,we in self.graph[post] :
+                        newClus.add(neiPost)
+                        neiPost.clusId.add(NEXT_CLUSTER_ID)
+                    post.clusId = set([NEXT_CLUSTER_ID])
+                self.clusters[NEXT_CLUSTER_ID] = newClus
+                NEXT_CLUSTER_ID += 1
+            elif len(pos_C) == 1 :
+                cid = pos_C.pop()
+                for post in connected :
+                    for neiPost,we in self.graph[post]:
+                        self.clusters[cid].add(post)
+                        neiPost.clusId.add(cid)
                     post.clusId.add(cid)
+            else:
+                cid = pos_C.pop()
+                for post in connected :
+                    for neiPost,we in self.graph[post] :
+                        self.clusters[cid].add(neiPost)
+                        neiPost.clusId.add(cid)
+                    post.clusId = set([cid])
+                for oldCid in pos_C :
+                    for post in self.clusters[oldCid]:
+                        post.clusId.remove(oldCid)
+                        post.clusId.add(cid)
+                    clusters[cid] = clusters[cid].union(clusters[oldCid])
+                    clusters[oldCid].clear()
         self.Sn.clear()
         self.S0.clear()
         #self.printStats()
@@ -186,7 +205,7 @@ class PostNetwork:
         for word in newPost.entities:
             for posts in self.entityDict[word.lower()]:
                 similarity[posts] += 1/len(self.entityDict[word.lower()]
-        for prevPost in similarity.keys() :
+        for prevPost in similarity.keys():
             '''try:
                 sim = similarity[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity[prevPost])
             except:
@@ -222,14 +241,14 @@ class PostNetwork:
         clus_posts = list()
         q = queue.Queue()
         explore = dict()
-        for post,we in self.graph[delPost]:
+        for post,we in self.graph[delPost] :
             if post.type == 'Core' :
                 clus_posts.add(post)
                 q.put(post)
                 explore[post] = False
         while (not q.empty()) :
             post = q.get()
-            for posta,we in self.graph[post]:
+            for posta,we in self.graph[post] :
                 if posta == 'Core' and not(posta in explore.keys()) :
                     explore[posta] = False
                     q.put(posta)
