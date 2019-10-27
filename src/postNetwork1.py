@@ -101,7 +101,8 @@ class PostNetwork:
                     self.noise.remove(neiPost)
                     self.borderPosts.append(neiPost)
                     neiPost.type = 'Border'
-
+        self.corePosts += S_n
+        self.corePosts += S_pl
         clus = self.S0+self.S_
         neg_C = set()
         for post in clus :
@@ -224,7 +225,6 @@ class PostNetwork:
                     self.noise.remove(prevPost)
                 prevPost.type = 'Core'
                 self.S_pl.append(prevPost)
-                self.corePosts.append(prevPost)
             if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0:
                 print('Conn bw ',newPost.id,' ',prevPost.id)
                 self.graph[newPost].append((prevPost,sim))
@@ -232,7 +232,6 @@ class PostNetwork:
         if newPost.weight/fad_sim(self.currTime,newPost.timeStamp) >= delta1:
             self.Sn.append(newPost)
             newPost.type = 'Core'
-            self.corePosts.append(newPost)
         else:
             if not 'Core' in [x.type for x,_ in self.graph[newPost]] :
                 newPost.type = 'Noise'
@@ -300,4 +299,5 @@ for index, row in df.iterrows():
     if NEXT_POST_ID%50 == 0:
         print(f'Processed {NEXT_POST_ID} posts')
         print(row['tweet_timeStamp'], postGraph.currTime + TIME_STEP, row['tweet_timeStamp'] <= postGraph.currTime + TIME_STEP, sep='\n')
+
 
