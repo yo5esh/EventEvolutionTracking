@@ -4,6 +4,7 @@ import math
 from datetime import timedelta
 import pandas as pd
 import numpy as np
+import queue
 
 epsilon0 = 0.055
 epsilon1 = 0.07
@@ -52,6 +53,7 @@ class PostNetwork:
         self.clusters = defaultdict(set)
         self.S0 = list()
         self.Sn = list()
+        self.S_, self.S_pl = list(),list()
         self.currTime = 0
 
 
@@ -74,17 +76,16 @@ class PostNetwork:
     def endTimeStep(self):
         global NEXT_CLUSTER_ID, TIME_STEP
         ########## S0 and Sn only have core posts
-        S_, S_pl = list(),list()
 
         ## Check for new border posts
         self.corePosts += self.Sn
-        for post in S_pl+self.Sn:
+        for post in self.S_pl+self.Sn:
             for neiPost,_ in self.graph[post]:
                 if post.type == 'Noise':
                     self.noise.remove(neiPost)
                     post.type = 'Border'
                     self.borderPosts.append(neiPost)
-        for post in S_:
+        for post in self.S_:
             for neiPost,_ in self.graph[post]:
                 if neiPost.type == 'Border':
                     if not 'Core' in [x.type for x,_ in self.graph[neiPost]]:
@@ -92,7 +93,7 @@ class PostNetwork:
                         self.borderPosts.remove(neiPost)
                         neiPost.type = 'Noise'
                         self.noise.append(neiPost)
-        for post in S_pl+self.Sn :
+        for post in self.S_pl+self.Sn :
             for neiPost,_ in self.graph[post] :
                 if neiPost.type == 'Noise' :
                     # Should be a borderpost
@@ -101,7 +102,7 @@ class PostNetwork:
                     self.borderPosts.append(neiPost)
                     neiPost.type = 'Border'
 
-        clus = self.S0+S_
+        clus = self.S0+self.S_
         neg_C = set()
         for post in clus:
             for neiPost,we in self.graph[post]:
@@ -115,7 +116,7 @@ class PostNetwork:
             return'''
         
         pos_C = set()
-        S_temp = set(self.Sn+S_pl)
+        S_temp = set(self.Sn+self.S_pl)
         explore = dict()
         for post in S_temp :
             explore[post] = True
@@ -178,7 +179,7 @@ class PostNetwork:
                 print('Removing ',post.id)
                 for neiPost,we in self.graph[post]:
                     neiPost.weight -= we                            ## core to non core can be checked here itself
-                    if neiPost.type == 'Core' and neiPost.weight/fad_sim(self.currTime,neipost.timeStamp) < delta1 :
+                    if neiPost.type == 'Core' and neiPost.weight/fad_sim(self.currTime,neiPost.timeStamp) < delta1 :
                         if not 'Core' in [x.type for x,_ in self.graph[neiPost]] :
                             neiPost.type = 'Noise'
                             self.noise.append(neiPost)
@@ -186,7 +187,7 @@ class PostNetwork:
                             neiPost.type = 'Border'
                             self.borderPosts.append(neiPost)
                         corePosts.remove(neiPost)
-                        S_.append(neiPost)
+                        self.S_.append(neiPost)
                     self.graph[neiPost].remove((post,we))
                 del self.graph[post]
                 if(post.type == 'Core'): 
@@ -204,7 +205,7 @@ class PostNetwork:
         similarity = defaultdict(lambda : 0)
         for word in newPost.entities:
             for posts in self.entityDict[word.lower()]:
-                similarity[posts] += 1/len(self.entityDict[word.lower()]
+                similarity[posts] += 1/len(self.entityDict[word.lower()])
         for prevPost in similarity.keys():
             '''try:
                 sim = similarity[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity[prevPost])
@@ -217,14 +218,14 @@ class PostNetwork:
             sim = similarity[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity[prevPost])
             print('We bw ',newPost.id,' ',prevPost.id, ' is ',sim)
             newPost.weight += sim                                           ## non core to core can be checked here itself
-            if not(newPost.type == 'Core') and newPost.weight/fad_sim(self.currTime,post.timeStamp) >= delta1:
+            if not(newPost.type == 'Core') and newPost.weight/fad_sim(self.currTime,newPost.timeStamp) >= delta1:
                 if newPost.type == 'Border' :
                     borderPosts.remove(newPost)
                 else :
                     noise.remove(newPost)
                 newPost.type = 'Core'
-                self.corePosts.append(post)
-                S_pl.append(post)
+                self.corePosts.append(newPost)
+                self.S_pl.append(newPost)
             prevPost.weight += sim
             if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0:
                 print('Conn bw ',newPost.id,' ',prevPost.id)
