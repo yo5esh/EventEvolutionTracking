@@ -76,33 +76,11 @@ class PostNetwork:
     def endTimeStep(self):
         global NEXT_CLUSTER_ID, TIME_STEP, delta1
         ########## S0 and Sn only have core posts
-        S_time = list()
         ## core->noncore posts due to change in time
         for post in self.corePosts :
             if post.weight/fad_sim(self.currTime,post.timeStamp) < delta1 :
-                S_time.append(post)
-        for post in S_time :
-            self.corePosts.remove(post)
-            for neighbours,we in self.graph[post] :
-                if (neighbours.type == 'Border') and (not 'Core' in [x.type for x,_ in self.graph[neighbours]]):
-                    neighbours.type = 'Noise'
-                    self.borderPosts.remove(neighbours)
-                    self.noise.append(neighbours)
-            if 'Core' in [x.type for x,_ in self.graph[post]] :
-                post.type = 'Border'
-                borderPosts.append(post)
-            else :
-                post.type = 'Noise'
-                noise.append(post)
-        self.corePosts += self.Sn
-        self.corePosts += self.S_pl
+                self.S_.append(post)
         ## Check for new border posts
-        for post in self.S_pl+self.Sn:
-            for neiPost,_ in self.graph[post]:
-                if post.type == 'Noise':
-                    self.noise.remove(neiPost)
-                    post.type = 'Border'
-                    self.borderPosts.append(neiPost)
         for post in self.S_:
             for neiPost,_ in self.graph[post]:
                 if neiPost.type == 'Border':
@@ -111,6 +89,12 @@ class PostNetwork:
                         self.borderPosts.remove(neiPost)
                         neiPost.type = 'Noise'
                         self.noise.append(neiPost)
+            if 'Core' in [x.type for x,_ in self.graph[post]] :
+                post.type = 'Border'
+                self.borderPosts.append(post)
+            else :
+                post.type = 'Noise'
+                self.noise.append(post)
         for post in self.S_pl+self.Sn :
             for neiPost,_ in self.graph[post] :
                 if neiPost.type == 'Noise' :
@@ -198,13 +182,9 @@ class PostNetwork:
                 for neiPost,we in self.graph[post]:
                     neiPost.weight -= we                            ## core to non core can be checked here itself
                     if neiPost.type == 'Core' and neiPost.weight/fad_sim(self.currTime,neiPost.timeStamp) < delta1 :
-                        if not 'Core' in [x.type for x,_ in self.graph[neiPost]] :
-                            neiPost.type = 'Noise'
-                            self.noise.append(neiPost)
-                        else :
-                            neiPost.type = 'Border'
-                            self.borderPosts.append(neiPost)
-                        corePosts.remove(neiPost)
+                        neiPost.type = 'Noise'
+                        self.noise.append(neiPost)
+                        self.corePosts.remove(neiPost)
                         self.S_.append(neiPost)
                     self.graph[neiPost].remove((post,we))
                 del self.graph[post]
@@ -239,11 +219,12 @@ class PostNetwork:
             newPost.weight += sim                                           ## non core to core can be checked here itself
             if not(prevPost.type == 'Core') and prevPost.weight/fad_sim(self.currTime,prevPost.timeStamp) >= delta1:
                 if prevPost.type == 'Border' :
-                    borderPosts.remove(prevPost)
+                    self.borderPosts.remove(prevPost)
                 else :
-                    noise.remove(prevPost)
+                    self.noise.remove(prevPost)
                 prevPost.type = 'Core'
-                self.S_pl.append(newPost)
+                self.S_pl.append(prevPost)
+                self.corePosts.append(prevPost)
             if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0:
                 print('Conn bw ',newPost.id,' ',prevPost.id)
                 self.graph[newPost].append((prevPost,sim))
@@ -251,6 +232,7 @@ class PostNetwork:
         if newPost.weight/fad_sim(self.currTime,newPost.timeStamp) >= delta1:
             self.Sn.append(newPost)
             newPost.type = 'Core'
+            self.corePosts.append(newPost)
         else:
             if not 'Core' in [x.type for x,_ in self.graph[newPost]] :
                 newPost.type = 'Noise'
