@@ -92,9 +92,7 @@ class PostNetwork:
             if 'Core' in [x.type for x,_ in self.graph[post]] :
                 post.type = 'Border'
                 self.borderPosts.append(post)
-            else :
-                post.type = 'Noise'
-                self.noise.append(post)
+                self.noise.remove(post)
         for post in self.S_pl+self.Sn :
             for neiPost,_ in self.graph[post] :
                 if neiPost.type == 'Noise' :
@@ -191,6 +189,8 @@ class PostNetwork:
                 if(post.type == 'Core'): 
                     self.corePosts.remove(post)
                     self.S0.append(post)
+                    post.type = 'Noise'
+                    self.noise.append(post)
                 elif(post.type == 'Border'): self.borderPosts.remove(post)
                 else : self.noise.remove(post)
                 self.posts.remove(post)
