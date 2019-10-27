@@ -297,4 +297,3 @@ for index, row in df.iterrows():
         print(f'Processed {NEXT_POST_ID} posts')
         print(row['tweet_timeStamp'], postGraph.currTime + TIME_STEP, row['tweet_timeStamp'] <= postGraph.currTime + TIME_STEP, sep='\n')
 
-    postGraph.random_Walk(Post(entities=row['filt_tweet_text'].split(' '), timeStamp=row['tweet_timeStamp']))
