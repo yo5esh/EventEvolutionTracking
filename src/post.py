@@ -216,8 +216,8 @@ class PostNetwork:
                 tfidf2 = []
                 for entity in prevPost.entities:
                     if entity in newPost.entities:
-                        tfidf1.append(prevPost.entities.count(entity)/len(prevPost.entities))*(math.log(len(self.posts)/len(self.entityDict[word.lower(entity)])))
-                        tfidf2.append(newPost.entities.count(entity)/len(newPost.entities))*(math.log(len(self.posts)/len(self.entityDict[word.lower(entity)])))
+                        tfidf1.append((prevPost.entities.count(entity)/len(prevPost.entities))*(math.log(len(self.posts)/len(self.entityDict[word.lower(entity)]))))
+                        tfidf2.append((newPost.entities.count(entity)/len(newPost.entities))*(math.log(len(self.posts)/len(self.entityDict[word.lower(entity)]))))
                 mag1=0
                 mag2=0
                 for tfidf in tfidf1:
