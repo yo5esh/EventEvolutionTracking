@@ -122,11 +122,11 @@ class PostNetwork:
             explore[post] = True
         while len(S_temp) :
             connected = list()
-            posta = S_temp.pop()
-            connected.append(posta)
+            post = S_temp.pop()
+            connected.append(post)
             q = queue.Queue()
-            q.add(posta)
-            explore[posta] = False
+            q.add(post)
+            explore[post] = False
             while (not(q.empty())) :
                 post = q.get()
                 for neiPost,we in self.graph[post] :
@@ -246,26 +246,27 @@ class PostNetwork:
             if post.type == 'Core' :
                 clus_posts.add(post)
                 q.put(post)
-                explore[post] = False
+                explore[post] = True
         while (not q.empty()) :
             post = q.get()
-            for posta,we in self.graph[post] :
-                if posta == 'Core' and not(posta in explore.keys()) :
-                    explore[posta] = False
-                    q.put(posta)
-                    clus_posts.add(posta)
-        while (not(len(clus_posts) == 0)) :
+            for neighbour,we in self.graph[post] :
+                if neighbour.type == 'Core' and not(neighbour in explore.keys()) :
+                    explore[neighbour] = True
+                    q.put(neighbour)
+                    clus_posts.add(neighbour)
+        explore[delPost] = False
+        while (len(clus_posts)) :
             ans+=1
             q.put(clus_posts[0])
-            explore[clus_posts[0]] = True
+            explore[clus_posts[0]] = False
             clus_posts.pop(0)
             while (not q.empty()) :
                 post = q.get()
-                for posta,we in self.graph[post]:
-                    if not (posta == delPost) and posta.type == 'Core' and explore[posta] == False :
-                        q.put(posta)
-                        explore[posta] = True
-                        clus_posts.remove(posta)
+                for neighbour,we in self.graph[post]:
+                    if neighbour.type == 'Core' and explore[neighbour] :
+                        q.put(neighbour)
+                        explore[neighbour] = False
+                        clus_posts.remove(neighbour)
         return ans
     
     def printStats(self):
