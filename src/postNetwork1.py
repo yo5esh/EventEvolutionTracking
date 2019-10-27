@@ -74,11 +74,29 @@ class PostNetwork:
         return None
 
     def endTimeStep(self):
-        global NEXT_CLUSTER_ID, TIME_STEP
+        global NEXT_CLUSTER_ID, TIME_STEP, delta1
         ########## S0 and Sn only have core posts
-
-        ## Check for new border posts
+        S_time = list()
+        ## core->noncore posts due to change in time
+        for post in self.corePosts :
+            if post.weight/fad_sim(self.currTime,post.timeStamp) < delta1 :
+                S_time.append(post)
+        for post in S_time :
+            self.corePosts.remove(post)
+            for neighbours,we in self.graph[post] :
+                if (neighbours.type == 'Border') and (not 'Core' in [x.type for x,_ in self.graph[neighbours]]):
+                    neighbours.type = 'Noise'
+                    self.borderPosts.remove(neighbours)
+                    self.noise.append(neighbours)
+            if 'Core' in [x.type for x,_ in self.graph[post]] :
+                post.type = 'Border'
+                borderPosts.append(post)
+            else :
+                post.type = 'Noise'
+                noise.append(post)
         self.corePosts += self.Sn
+        self.corePosts += self.S_pl
+        ## Check for new border posts
         for post in self.S_pl+self.Sn:
             for neiPost,_ in self.graph[post]:
                 if post.type == 'Noise':
@@ -104,7 +122,7 @@ class PostNetwork:
 
         clus = self.S0+self.S_
         neg_C = set()
-        for post in clus:
+        for post in clus :
             for neiPost,we in self.graph[post]:
                 if neiPost.type == 'Core' and we >= epsilon1 and len(neiPost.clusId):# Should we check if conn is core conn also?
                     neg_C.add(next(iter(neiPost.clusId)))# Gives element from a set
@@ -162,7 +180,7 @@ class PostNetwork:
                         neiPost.clusId.add(cid)
                     post.clusId = set([cid])
                 for oldCid in pos_C :
-                    for post in self.clusters[oldCid]:
+                    for post in self.clusters[oldCid] :
                         post.clusId.remove(oldCid)
                         post.clusId.add(cid)
                     clusters[cid] = clusters[cid].union(clusters[oldCid])
@@ -217,16 +235,15 @@ class PostNetwork:
                 sim = '''
             sim = similarity[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity[prevPost])
             print('We bw ',newPost.id,' ',prevPost.id, ' is ',sim)
-            newPost.weight += sim                                           ## non core to core can be checked here itself
-            if not(newPost.type == 'Core') and newPost.weight/fad_sim(self.currTime,newPost.timeStamp) >= delta1:
-                if newPost.type == 'Border' :
-                    borderPosts.remove(newPost)
-                else :
-                    noise.remove(newPost)
-                newPost.type = 'Core'
-                self.corePosts.append(newPost)
-                self.S_pl.append(newPost)
             prevPost.weight += sim
+            newPost.weight += sim                                           ## non core to core can be checked here itself
+            if not(prevPost.type == 'Core') and prevPost.weight/fad_sim(self.currTime,prevPost.timeStamp) >= delta1:
+                if prevPost.type == 'Border' :
+                    borderPosts.remove(prevPost)
+                else :
+                    noise.remove(prevPost)
+                prevPost.type = 'Core'
+                self.S_pl.append(newPost)
             if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0:
                 print('Conn bw ',newPost.id,' ',prevPost.id)
                 self.graph[newPost].append((prevPost,sim))
@@ -235,8 +252,12 @@ class PostNetwork:
             self.Sn.append(newPost)
             newPost.type = 'Core'
         else:
-            newPost.type = 'Noise'                                              ## might be border
-            self.noise.append(newPost)
+            if not 'Core' in [x.type for x,_ in self.graph[newPost]] :
+                newPost.type = 'Noise'
+                self.noise.append(newPost)
+            else :
+                newPost.type = 'Border'
+                self.borderPosts.append(newPost)
     def nc_p0(self,delPost):
         ans = 0
         clus_posts = list()
