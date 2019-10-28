@@ -15,6 +15,8 @@ SLIDING_WINDOW = 1000000
 TIME_STEP = 540000
 LAMBDA = 200 # Without this we encounter overflow in fad_sim function
 
+potential_neigh_thres = 0.05
+
 def fad_sim(a,b):
     '''datetimeFormat = '%S'
     a = str(a)
@@ -63,7 +65,9 @@ class PostNetwork:
             return
         self.posts.append(post)
         self.updateConns(post)
-        for noun in post.entities:
+        l = []
+        l = set(post.entities)
+        for noun in l:
             if noun != '':
                 self.entityDict[noun.lower()].append(post) # All nouns are stored in lower case
 
@@ -201,34 +205,42 @@ class PostNetwork:
         
     
     def updateConns(self, newPost):
-        similarity = defaultdict(lambda : 0)
+        similarity_for_jac = defaultdict(lambda : 0)
+        similarity_for_pot = defaultdict(lambda : 0)
         for word in newPost.entities:
             for posts in self.entityDict[word.lower()]:
-                similarity[posts] += 1/len(self.entityDict[word.lower()])
-        for prevPost in similarity.keys():
-            '''try:
-                sim = similarity[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity[prevPost])
-            except:
-                print('error')
-                print(newPost.entities)
-                print(prevPost.entities)
-                print(similarity[prevPost])
-                sim = '''
-            sim = similarity[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity[prevPost])
-            print('We bw ',newPost.id,' ',prevPost.id, ' is ',sim)
+                similarity_for_pot[posts] += 1/len(self.entityDict[word.lower()])
+                similarity_for_jac[posts] += 1
+                                        
+        for prevPost in similarity_for_pot.keys():
+            if(similarity_for_pot[prevPost] > potential_neigh_thres):
+                #sim = similarity_for_jac[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity_for_jac[prevPost])
+                tfidf1 = []
+                tfidf2 = []
+                for entity in prevPost.entities:
+                    if entity in newPost.entities:
+                        tfidf1 = (prevPost.entities.count(entity)/len(prevPost.entities))*(math.log(len(self.posts)/len(self.entityDict[word.lower(entity)])))
+                        tfidf1 = (newPost.entities.count(entity)/len(newPost.entities))*(math.log(len(self.posts)/len(self.entityDict[word.lower(entity)])))
+                mag1=0
+                mag2=0
+                for tfidf in tfidf1:
+                    mag1 += tfidf*tfidf
+                for tfidf in tfidf2:
+                    mag2 += tfidf*tfidf
+                mag1 = math.sqrt(mag1)
+                mag2 = math.sqrt(mag2)
+                count = 0
+                for i in range(len(tfidf)):
+                    count += tfidf1[i]*tfidf2[i]
+                sim = count/(mag1*mag2)
+                print('We bw ',newPost.id,' ',prevPost.id, ' is ',sim)
+            newPost.weight += sim
             prevPost.weight += sim
-            newPost.weight += sim                                           ## non core to core can be checked here itself
-            if not(prevPost.type == 'Core') and prevPost.weight/fad_sim(self.currTime,prevPost.timeStamp) >= delta1:
-                if prevPost.type == 'Border' :
-                    self.borderPosts.remove(prevPost)
-                else :
-                    self.noise.remove(prevPost)
-                prevPost.type = 'Core'
-                self.S_pl.append(prevPost)
             if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0:
-                print('Conn bw ',newPost.id,' ',prevPost.id)
-                self.graph[newPost].append((prevPost,sim))
-                self.graph[prevPost].append((newPost,sim))
+                print('Conn bw ',newPost.id,' ',prevPost.id) 
+            self.graph[newPost].append((prevPost,sim))
+            self.graph[prevPost].append((newPost,sim))
+            
         if newPost.weight/fad_sim(self.currTime,newPost.timeStamp) >= delta1:
             self.Sn.append(newPost)
             newPost.type = 'Core'
