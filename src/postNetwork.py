@@ -243,8 +243,9 @@ class PostNetwork:
         else:
             newPost.type = 'Noise'
             self.noise.append(newPost)
+    
     def nc_p0(self,delPost):
-        ans = 0
+        listOfClusters = []
         clus_posts = list()
         q = queue.Queue()
         explore = dict()
@@ -262,7 +263,8 @@ class PostNetwork:
                     clus_posts.add(neighbour)
         explore[delPost] = False
         while (not(len(clus_posts) == 0)) :
-            ans+=1
+            cluster = []
+            cluster.append(clus_posts[0])
             q.put(clus_posts[0])
             explore[clus_posts[0]] = False
             clus_posts.pop(0)
@@ -270,10 +272,12 @@ class PostNetwork:
                 post = q.get()
                 for neighbour,we in self.graph[post]:
                     if neighbour.type == 'Core' and explore[neighbour] :
+                        cluster.append(neighbour)
                         q.put(neighbour)
                         explore[neighbour] = False
                         clus_posts.remove(neighbour)
-        return ans
+            listOfClusters.append(cluster)
+        return listOfClusters
     
     def printStats(self):
         print('********************************************************')
