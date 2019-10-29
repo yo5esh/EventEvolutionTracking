@@ -93,7 +93,7 @@ class PostNetwork:
                         self.borderPosts.remove(neiPost)
                         neiPost.type = 'Noise'
                         self.noise.append(neiPost)
-            if 'Core' in [x.type for x,_ in self.graph[post]] :
+            if 'Core' in [x.type for x,_ in self.graph[post]] and post.type != 'Border':
                 post.type = 'Border'
                 self.borderPosts.append(post)
                 self.noise.remove(post)
@@ -105,10 +105,8 @@ class PostNetwork:
                     self.noise.remove(neiPost)
                     self.borderPosts.append(neiPost)
                     neiPost.type = 'Border'
-                if neiPost.type == 'Border' :
-                    neiPost.clusId.add(next(iter(post.clusId)))
-        self.corePosts += S_n
-        self.corePosts += S_pl
+        self.corePosts += self.Sn
+        self.corePosts += self.S_pl
         clus = self.S0+self.S_
         neg_C = set()
         for post in clus :
@@ -132,7 +130,7 @@ class PostNetwork:
             post = S_temp.pop()
             connected.append(post)
             q = queue.Queue()
-            q.add(post)
+            q.put(post)
             explore[post] = False
             while (not(q.empty())) :
                 post = q.get()
@@ -142,7 +140,7 @@ class PostNetwork:
                             pos_C.add(next(iter(neiPost.clusId)))
                         elif explore[neiPost] :
                             explore[neiPost] = False
-                            q.add(neiPost)
+                            q.put(neiPost)
                             connected.append(neiPost)
             S_temp = S_temp - set(connected)
             if len(pos_C) == 0:
@@ -236,7 +234,7 @@ class PostNetwork:
                 mag1 = math.sqrt(mag1)
                 mag2 = math.sqrt(mag2)
                 count = 0
-                for i in range(len(tfidf)):
+                for i in range(len(tfidf1)):
                     count += tfidf1[i]*tfidf2[i]
                 sim = count/(mag1*mag2)
                 print('We bw ',newPost.id,' ',prevPost.id, ' is ',sim)
