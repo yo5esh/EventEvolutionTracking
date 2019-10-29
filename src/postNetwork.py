@@ -105,6 +105,8 @@ class PostNetwork:
                     self.noise.remove(neiPost)
                     self.borderPosts.append(neiPost)
                     neiPost.type = 'Border'
+                if neiPost.type == 'Border' :
+                    neiPost.clusId.add(next(iter(post.clusId)))
         self.corePosts += S_n
         self.corePosts += S_pl
         clus = self.S0+self.S_
@@ -189,6 +191,7 @@ class PostNetwork:
                         self.noise.append(neiPost)
                         self.corePosts.remove(neiPost)
                         self.S_.append(neiPost)
+                        self.nc_p0(neiPost)
                     self.graph[neiPost].remove((post,we))
                 del self.graph[post]
                 if(post.type == 'Core'): 
@@ -196,9 +199,12 @@ class PostNetwork:
                     self.S0.append(post)
                     post.type = 'Noise'
                     self.noise.append(post)
+                    self.nc_p0(post)
                 elif(post.type == 'Border'): self.borderPosts.remove(post)
                 else : self.noise.remove(post)
                 self.posts.remove(post)
+                for clus in post.clusId :
+                    self.clusters[clus].remove(post)
             else:
                 break
         return
@@ -209,7 +215,7 @@ class PostNetwork:
         similarity_for_pot = defaultdict(lambda : 0)
         for word in newPost.entities:
             for posts in self.entityDict[word.lower()]:
-                similarity_for_pot[posts] += 1/len(self.entityDict[word.lower()])
+                similarity_for_pot[posts] += 1/(len(self.entityDict[word.lower()])+1)
                 similarity_for_jac[posts] += 1
                                         
         for prevPost in similarity_for_pot.keys():
@@ -219,8 +225,8 @@ class PostNetwork:
                 tfidf2 = []
                 for entity in prevPost.entities:
                     if entity in newPost.entities:
-                        tfidf1 = (prevPost.entities.count(entity)/len(prevPost.entities))*(math.log(len(self.posts)/len(self.entityDict[word.lower(entity)])))
-                        tfidf1 = (newPost.entities.count(entity)/len(newPost.entities))*(math.log(len(self.posts)/len(self.entityDict[word.lower(entity)])))
+                        tfidf1.append((prevPost.entities.count(entity)/len(prevPost.entities))*(math.log(len(self.posts)/(len(self.entityDict[entity.lower()])+1))))
+                        tfidf2.append((newPost.entities.count(entity)/len(newPost.entities))*(math.log(len(self.posts)/(len(self.entityDict[entity.lower()])+1))))
                 mag1=0
                 mag2=0
                 for tfidf in tfidf1:
@@ -251,29 +257,26 @@ class PostNetwork:
             else :
                 newPost.type = 'Border'
                 self.borderPosts.append(newPost)
-    def nc_p0(self,delPost):
-        ans = 0
-        clus_posts = list()
+
+    def nc_p0(self, delPost):
+        delClustId = delPost.clusId.pop()
+        postsInCluster = self.clusters[delClustId]
+        clus_posts = []
+        for post in postsInCluster:
+            if post.type == 'Core' :
+                clus_posts.append(post)
+            post.clusId.remove(delClustId)
         q = queue.Queue()
         explore = dict()
-        for post,we in self.graph[delPost] :
-            if post.type == 'Core' :
-                clus_posts.add(post)
-                q.put(post)
-                explore[post] = True
-        while (not q.empty()) :
-            post = q.get()
-            for neighbour,we in self.graph[post] :
-                if neighbour.type == 'Core' and not(neighbour in explore.keys()) :
-                    explore[neighbour] = True
-                    q.put(neighbour)
-                    clus_posts.add(neighbour)
-        explore[delPost] = False
+        for post in clus_posts:
+            explore[post] = True
         while (len(clus_posts)) :
-            ans+=1
+            cluster = set()
+            cluster.add(clus_posts[0])
             q.put(clus_posts[0])
             explore[clus_posts[0]] = False
             clus_posts.pop(0)
+            clus_posts[0].clusId.add(NEXT_CLUSTER_ID)
             while (not q.empty()) :
                 post = q.get()
                 for neighbour,we in self.graph[post]:
@@ -281,7 +284,11 @@ class PostNetwork:
                         q.put(neighbour)
                         explore[neighbour] = False
                         clus_posts.remove(neighbour)
-        return ans
+                    cluster.add(neighbour)
+                    neighbour.clusId.add(NEXT_CLUSTER_ID)
+            self.clusters[NEXT_CLUSTER_ID] = cluster
+            NEXT_CLUSTER_ID += 1
+        self.clusters.pop(delClustId, None)
     
     def printStats(self):
         print('********************************************************')
