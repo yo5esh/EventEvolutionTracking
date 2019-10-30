@@ -268,22 +268,22 @@ class PostNetwork:
         explore = dict()
         for post in clus_posts:
             explore[post] = True
+        explore[delPost] = False
         while (len(clus_posts)) :
             cluster = set()
             cluster.add(clus_posts[0])
             q.put(clus_posts[0])
             explore[clus_posts[0]] = False
             clus_posts.pop(0)
-            clus_posts[0].clusId.add(NEXT_CLUSTER_ID)
             while (not q.empty()) :
                 post = q.get()
+                cluster.add(post)
+                post.clusId.add(NEXT_CLUSTER_ID)
                 for neighbour,we in self.graph[post]:
                     if neighbour.type == 'Core' and explore[neighbour] :
                         q.put(neighbour)
                         explore[neighbour] = False
                         clus_posts.remove(neighbour)
-                    cluster.add(neighbour)
-                    neighbour.clusId.add(NEXT_CLUSTER_ID)
             self.clusters[NEXT_CLUSTER_ID] = cluster
             NEXT_CLUSTER_ID += 1
         self.clusters.pop(delClustId, None)
