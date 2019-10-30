@@ -240,10 +240,18 @@ class PostNetwork:
                 print('We bw ',newPost.id,' ',prevPost.id, ' is ',sim)
             newPost.weight += sim
             prevPost.weight += sim
+            if not(prevPost.type == 'Core') and prevPost.weight/fad_sim(self.currTime,prevPost.timeStamp) >= delta1:
+                prevPost.type = 'Core'
+                self.S_pl.append(prevPost)
+                for neighbour,we in self.graph[prevPost] :
+                    if neighbour.type == 'Noise'
+                        self.noise.remove(neighbour)
+                        neighbour.type = 'Border'
+                        self.borderPosts.append(neighbour)
             if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0:
-                print('Conn bw ',newPost.id,' ',prevPost.id) 
-            self.graph[newPost].append((prevPost,sim))
-            self.graph[prevPost].append((newPost,sim))
+                print('Conn bw ',newPost.id,' ',prevPost.id)
+                self.graph[newPost].append((prevPost,sim))
+                self.graph[prevPost].append((newPost,sim))
             
         if newPost.weight/fad_sim(self.currTime,newPost.timeStamp) >= delta1:
             self.Sn.append(newPost)
