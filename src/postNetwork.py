@@ -5,6 +5,7 @@ from datetime import timedelta
 import pandas as pd
 import numpy as np
 import queue
+
 epsilon0 = 0.055
 epsilon1 = 0.07
 delta1 = 0.08
@@ -14,7 +15,7 @@ SLIDING_WINDOW = 1000000
 TIME_STEP = 540000
 LAMBDA = 200 # Without this we encounter overflow in fad_sim function
 
-potential_neigh_thres = 0.05 #check this value
+potential_neigh_thres = 0.05
 
 def fad_sim(a,b):
     '''datetimeFormat = '%S'
@@ -51,9 +52,10 @@ class PostNetwork:
         self.entityDict = defaultdict(list)
         self.graph = defaultdict(list)
         self.sketchGraph = defaultdict(list)
-        self.clusters = defaultdict(list)
+        self.clusters = defaultdict(set)
         self.S0 = list()
         self.Sn = list()
+        self.S_, self.S_pl = list(),list()
         self.currTime = 0
 
 
@@ -64,7 +66,7 @@ class PostNetwork:
         self.posts.append(post)
         self.updateConns(post)
         l = []
-        l = set(post.entities) # to remove duplicates
+        l = set(post.entities)
         for noun in l:
             if noun != '':
                 self.entityDict[noun.lower()].append(post) # All nouns are stored in lower case
@@ -76,43 +78,14 @@ class PostNetwork:
         return None
 
     def endTimeStep(self):
-        global NEXT_CLUSTER_ID, TIME_STEP
+        global NEXT_CLUSTER_ID, TIME_STEP, delta1
         ########## S0 and Sn only have core posts
-        S_, S_pl = list(),list()
-
-        ## Checking for core->noncore posts
-        for i,post in enumerate(self.corePosts):
-            if post.weight/fad_sim(self.currTime,post.timeStamp) < delta1:
-                post.type = 'Noise'
-                del self.corePosts[i]
-                self.noise.append(post)
-                S_.append(post)
-
-        # Check for new core posts
-        for i,post in enumerate(self.borderPosts):
-            if post.weight/fad_sim(self.currTime,post.timeStamp) >= delta1:
-                post.type = 'Core'
-                del self.borderPosts[i]
-                self.corePosts.append(post)
-                S_pl.append(post)
-
-        for i,post in enumerate(self.noise):
-            if post.weight/fad_sim(self.currTime,post.timeStamp) >= delta1:
-                post.type = 'Core'
-                del self.noise[i]
-                self.corePosts.append(post)
-                S_pl.append(post)
-
+        ## core->noncore posts due to change in time
+        for post in self.corePosts :
+            if post.weight/fad_sim(self.currTime,post.timeStamp) < delta1 :
+                self.S_.append(post)
         ## Check for new border posts
-        self.corePosts += self.Sn
-        self.corePosts += S_pl
-        for post in S_pl+self.Sn:
-            for neiPost,_ in self.graph[post]:
-                if post.type == 'Noise':
-                    self.noise.remove(neiPost)
-                    post.type = 'Border'
-                    self.borderPosts.append(neiPost)
-        for post in S_:
+        for post in self.S_:
             for neiPost,_ in self.graph[post]:
                 if neiPost.type == 'Border':
                     if not 'Core' in [x.type for x,_ in self.graph[neiPost]]:
@@ -120,19 +93,23 @@ class PostNetwork:
                         self.borderPosts.remove(neiPost)
                         neiPost.type = 'Noise'
                         self.noise.append(neiPost)
-        for post in S_pl+self.Sn:
-            for neiPost,_ in self.graph[post]:
-                if neiPost.type == 'Noise':
-                    if 'Core' in [x.type for x,_ in self.graph[neiPost]]:
-                        # Should be a borderpost
-                        print('New n -> b ----- ',neiPost.id)
-                        self.noise.remove(neiPost)
-                        self.borderPosts.append(neiPost)
-                        neiPost.type = 'Border'
-
-        clus = self.S0+S_
+            if 'Core' in [x.type for x,_ in self.graph[post]] and post.type != 'Border':
+                post.type = 'Border'
+                self.borderPosts.append(post)
+                self.noise.remove(post)
+        for post in self.S_pl+self.Sn :
+            for neiPost,_ in self.graph[post] :
+                if neiPost.type == 'Noise' :
+                    # Should be a borderpost
+                    print('New n -> b ----- ',neiPost.id)
+                    self.noise.remove(neiPost)
+                    self.borderPosts.append(neiPost)
+                    neiPost.type = 'Border'
+        self.corePosts += self.Sn
+        self.corePosts += self.S_pl
+        clus = self.S0+self.S_
         neg_C = set()
-        for post in clus:
+        for post in clus :
             for neiPost,we in self.graph[post]:
                 if neiPost.type == 'Core' and we >= epsilon1 and len(neiPost.clusId):# Should we check if conn is core conn also?
                     neg_C.add(next(iter(neiPost.clusId)))# Gives element from a set
@@ -142,40 +119,59 @@ class PostNetwork:
             return
         else:
             return'''
-
+        
         pos_C = set()
-        for post in self.Sn+S_pl:
-            for neiPost,we in self.graph[post]:
-                if neiPost.type == 'Core' and we >= epsilon1 and len(neiPost.clusId):# Should we check if conn is core conn also?
-                    pos_C.add(next(iter(neiPost.clusId)))
-
-        if len(pos_C) == 0:
-            newClus = self.Sn + S_pl
-            for post in self.Sn+S_pl:
-                for neiPost,we in self.graph[post]:
-                    newClus.append(neiPost)
-                    neiPost.clusId.add(NEXT_CLUSTER_ID)
-                post.clusId = set([NEXT_CLUSTER_ID])
-            self.clusters[NEXT_CLUSTER_ID] = newClus
-            NEXT_CLUSTER_ID += 1
-        elif len(pos_C) == 1:
-            cid = pos_C.pop()
-            for post in self.Sn+S_pl:
-                for neiPost,we in self.graph[post]:
-                    self.clusters[cid].append(post)
-                    neiPost.clusId.add(cid)
-                post.clusId = set([NEXT_CLUSTER_ID])
-        else:
-            cid = pos_C.pop()
-            for post in self.Sn+S_pl:
-                for neiPost,we in self.graph[post]:
-                    self.clusters[cid].append(neiPost)
-                    neiPost.clusId.add(cid)
-                post.clusId = set([cid])
-            for oldCid in pos_C:
-                for post in self.clusters[oldCid]:
-                    post.clusId.remove(oldCid)
+        S_temp = set(self.Sn+self.S_pl)
+        explore = dict()
+        for post in S_temp :
+            explore[post] = True
+        while len(S_temp) :
+            connected = list()
+            post = S_temp.pop()
+            connected.append(post)
+            q = queue.Queue()
+            q.put(post)
+            explore[post] = False
+            while (not(q.empty())) :
+                post = q.get()
+                for neiPost,we in self.graph[post] :
+                    if neiPost.type == 'Core' :
+                        if len(neiPost.clusId) :
+                            pos_C.add(next(iter(neiPost.clusId)))
+                        elif explore[neiPost] :
+                            explore[neiPost] = False
+                            q.put(neiPost)
+                            connected.append(neiPost)
+            S_temp = S_temp - set(connected)
+            if len(pos_C) == 0:
+                newClus = set(connected)
+                for post in connected :
+                    for neiPost,we in self.graph[post] :
+                        newClus.add(neiPost)
+                        neiPost.clusId.add(NEXT_CLUSTER_ID)
+                    post.clusId = set([NEXT_CLUSTER_ID])
+                self.clusters[NEXT_CLUSTER_ID] = newClus
+                NEXT_CLUSTER_ID += 1
+            elif len(pos_C) == 1 :
+                cid = pos_C.pop()
+                for post in connected :
+                    for neiPost,we in self.graph[post]:
+                        self.clusters[cid].add(post)
+                        neiPost.clusId.add(cid)
                     post.clusId.add(cid)
+            else:
+                cid = pos_C.pop()
+                for post in connected :
+                    for neiPost,we in self.graph[post] :
+                        self.clusters[cid].add(neiPost)
+                        neiPost.clusId.add(cid)
+                    post.clusId = set([cid])
+                for oldCid in pos_C :
+                    for post in self.clusters[oldCid] :
+                        post.clusId.remove(oldCid)
+                        post.clusId.add(cid)
+                    clusters[cid] = clusters[cid].union(clusters[oldCid])
+                    clusters[oldCid].clear()
         self.Sn.clear()
         self.S0.clear()
         #self.printStats()
@@ -187,27 +183,38 @@ class PostNetwork:
             if fad_sim(self.currTime,post.timeStamp) > SLIDING_WINDOW:
                 print('Removing ',post.id)
                 for neiPost,we in self.graph[post]:
-                    neiPost.weight -= we
+                    neiPost.weight -= we                            ## core to non core can be checked here itself
+                    if neiPost.type == 'Core' and neiPost.weight/fad_sim(self.currTime,neiPost.timeStamp) < delta1 :
+                        neiPost.type = 'Noise'
+                        self.noise.append(neiPost)
+                        self.corePosts.remove(neiPost)
+                        self.S_.append(neiPost)
+                        self.nc_p0(neiPost)
                     self.graph[neiPost].remove((post,we))
                 del self.graph[post]
                 if(post.type == 'Core'): 
                     self.corePosts.remove(post)
                     self.S0.append(post)
+                    post.type = 'Noise'
+                    self.noise.append(post)
+                    self.nc_p0(post)
                 elif(post.type == 'Border'): self.borderPosts.remove(post)
-                elif(post.type == 'Noise'): self.noise.remove(post)
+                else : self.noise.remove(post)
                 self.posts.remove(post)
+                for clus in post.clusId :
+                    self.clusters[clus].remove(post)
             else:
                 break
         return
         
     
     def updateConns(self, newPost):
-        #similarity_for_jac = defaultdict(lambda : 0)
+        similarity_for_jac = defaultdict(lambda : 0)
         similarity_for_pot = defaultdict(lambda : 0)
         for word in newPost.entities:
             for posts in self.entityDict[word.lower()]:
-                similarity_for_pot[posts] += 1/len(self.entityDict[word.lower()])
-                #similarity_for_jac[posts] += 1
+                similarity_for_pot[posts] += 1/(len(self.entityDict[word.lower()])+1)
+                similarity_for_jac[posts] += 1
                                         
         for prevPost in similarity_for_pot.keys():
             if(similarity_for_pot[prevPost] > potential_neigh_thres):
@@ -216,8 +223,8 @@ class PostNetwork:
                 tfidf2 = []
                 for entity in prevPost.entities:
                     if entity in newPost.entities:
-                        tfidf1.append((prevPost.entities.count(entity)/len(prevPost.entities))*(math.log(len(self.posts)/len(self.entityDict[word.lower(entity)]))))
-                        tfidf2.append((newPost.entities.count(entity)/len(newPost.entities))*(math.log(len(self.posts)/len(self.entityDict[word.lower(entity)]))))
+                        tfidf1.append((prevPost.entities.count(entity)/len(prevPost.entities))*(math.log(len(self.posts)/(len(self.entityDict[entity.lower()])+1))))
+                        tfidf2.append((newPost.entities.count(entity)/len(newPost.entities))*(math.log(len(self.posts)/(len(self.entityDict[entity.lower()])+1))))
                 mag1=0
                 mag2=0
                 for tfidf in tfidf1:
@@ -227,53 +234,67 @@ class PostNetwork:
                 mag1 = math.sqrt(mag1)
                 mag2 = math.sqrt(mag2)
                 count = 0
-                for i in range(len(tfidf)):
+                for i in range(len(tfidf1)):
                     count += tfidf1[i]*tfidf2[i]
-                sim = count/(mag1*mag2) 
+                sim = count/(mag1*mag2)
                 print('We bw ',newPost.id,' ',prevPost.id, ' is ',sim)
             newPost.weight += sim
             prevPost.weight += sim
+            if not(prevPost.type == 'Core') and prevPost.weight/fad_sim(self.currTime,prevPost.timeStamp) >= delta1:
+                prevPost.type = 'Core'
+                self.S_pl.append(prevPost)
+                for neighbour,we in self.graph[prevPost] :
+                    if neighbour.type == 'Noise'
+                        self.noise.remove(neighbour)
+                        neighbour.type = 'Border'
+                        self.borderPosts.append(neighbour)
             if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0:
                 print('Conn bw ',newPost.id,' ',prevPost.id)
                 self.graph[newPost].append((prevPost,sim))
                 self.graph[prevPost].append((newPost,sim))
+            
         if newPost.weight/fad_sim(self.currTime,newPost.timeStamp) >= delta1:
             self.Sn.append(newPost)
             newPost.type = 'Core'
         else:
-            newPost.type = 'Noise'
-            self.noise.append(newPost)
-    def nc_p0(self,delPost):
-        ans = 0
-        clus_posts = list()
+            if not 'Core' in [x.type for x,_ in self.graph[newPost]] :
+                newPost.type = 'Noise'
+                self.noise.append(newPost)
+            else :
+                newPost.type = 'Border'
+                self.borderPosts.append(newPost)
+
+    def nc_p0(self, delPost):
+        delClustId = delPost.clusId.pop()
+        postsInCluster = self.clusters[delClustId]
+        clus_posts = []
+        for post in postsInCluster:
+            if post.type == 'Core' :
+                clus_posts.append(post)
+            post.clusId.remove(delClustId)
         q = queue.Queue()
         explore = dict()
-        for post,we in self.graph[delPost]:
-            if post.type == 'Core' :
-                clus_posts.add(post)
-                q.put(post)
-                explore[post] = True
-        while (not q.empty()) :
-            post = q.get()
-            for neighbour,we in self.graph[post]:
-                if neighbour == 'Core' and not(neighbour in explore.keys()) :
-                    explore[neighbour] = True
-                    q.put(neighbour)
-                    clus_posts.add(neighbour)
+        for post in clus_posts:
+            explore[post] = True
         explore[delPost] = False
-        while (not(len(clus_posts) == 0)) :
-            ans+=1
+        while (len(clus_posts)) :
+            cluster = set()
+            cluster.add(clus_posts[0])
             q.put(clus_posts[0])
             explore[clus_posts[0]] = False
             clus_posts.pop(0)
             while (not q.empty()) :
                 post = q.get()
+                cluster.add(post)
+                post.clusId.add(NEXT_CLUSTER_ID)
                 for neighbour,we in self.graph[post]:
                     if neighbour.type == 'Core' and explore[neighbour] :
                         q.put(neighbour)
                         explore[neighbour] = False
                         clus_posts.remove(neighbour)
-        return ans
+            self.clusters[NEXT_CLUSTER_ID] = cluster
+            NEXT_CLUSTER_ID += 1
+        self.clusters.pop(delClustId, None)
     
     def printStats(self):
         print('********************************************************')
