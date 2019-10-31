@@ -219,6 +219,94 @@ class PostNetwork:
             else:
                 break
         return
+    
+    
+    def updateConns(self, newPost):
+        similarity_for_jac = defaultdict(lambda : 0)
+        similarity_for_pot = defaultdict(lambda : 0)
+        for word in newPost.entities:
+            for posts in self.entityDict[word.lower()]:
+                similarity_for_pot[posts] += 1/(len(self.entityDict[word.lower()])+1)
+                similarity_for_jac[posts] += 1
+        for prevPost in similarity_for_pot.keys():
+            if(similarity_for_pot[prevPost] > potential_neigh_thres):
+                #sim = similarity_for_jac[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity_for_jac[prevPost])
+                tfidf1 = []
+                tfidf2 = []
+                for entity in prevPost.entities:
+                    if entity in newPost.entities:
+                        tfidf1.append((prevPost.entities.count(entity)/len(prevPost.entities))*(math.log(len(self.posts)/(len(self.entityDict[entity.lower()])+1))))
+                        tfidf2.append((newPost.entities.count(entity)/len(newPost.entities))*(math.log(len(self.posts)/(len(self.entityDict[entity.lower()])+1))))
+                mag1=0
+                mag2=0
+                for tfidf in tfidf1:
+                    mag1 += tfidf*tfidf
+                for tfidf in tfidf2:
+                    mag2 += tfidf*tfidf
+                mag1 = math.sqrt(mag1)
+                mag2 = math.sqrt(mag2)
+                count = 0
+                for i in range(len(tfidf1)):
+                    count += tfidf1[i]*tfidf2[i]
+                sim = count/(mag1*mag2)
+                print('We bw ',newPost.id,' ',prevPost.id, ' is ',sim)
+            newPost.weight += sim
+            prevPost.weight += sim
+            if not(prevPost.type == 'Core') and prevPost.weight/fad_sim(self.currTime,prevPost.timeStamp) >= delta1:
+                prevPost.type = 'Core'
+                self.S_pl.append(prevPost)
+                for neighbour,we in self.graph[prevPost] :
+                    if neighbour.type == 'Noise':
+                        self.noise.remove(neighbour)
+                        neighbour.type = 'Border'
+                        self.borderPosts.append(neighbour)
+            if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0:
+                print('Conn bw ',newPost.id,' ',prevPost.id)
+                self.graph[newPost].append((prevPost,sim))
+                self.graph[prevPost].append((newPost,sim))
+            
+        if newPost.weight/fad_sim(self.currTime,newPost.timeStamp) >= delta1:
+            self.Sn.append(newPost)
+            newPost.type = 'Core'
+        else:
+            if not 'Core' in [x.type for x,_ in self.graph[newPost]] :
+                newPost.type = 'Noise'
+                self.noise.append(newPost)
+            else :
+                newPost.type = 'Border'
+                self.borderPosts.append(newPost)
+
+    def nc_p0(self, delPost):
+        delClustId = delPost.clusId.pop()
+        postsInCluster = self.clusters[delClustId]
+        clus_posts = []
+        for post in postsInCluster:
+            if post.type == 'Core' :
+                clus_posts.append(post)
+            post.clusId.remove(delClustId)
+        q = queue.Queue()
+        explore = dict()
+        for post in clus_posts:
+            explore[post] = True
+        explore[delPost] = False
+        while (len(clus_posts)) :
+            cluster = set()
+            cluster.add(clus_posts[0])
+            q.put(clus_posts[0])
+            explore[clus_posts[0]] = False
+            clus_posts.pop(0)
+            while (not q.empty()) :
+                post = q.get()
+                cluster.add(post)
+                post.clusId.add(NEXT_CLUSTER_ID)
+                for neighbour,we in self.graph[post]:
+                    if neighbour.type == 'Core' and explore[neighbour] :
+                        q.put(neighbour)
+                        explore[neighbour] = False
+                        clus_posts.remove(neighbour)
+            self.clusters[NEXT_CLUSTER_ID] = cluster
+            NEXT_CLUSTER_ID += 1
+        self.clusters.pop(delClustId, None)
         
     
     def printStats(self):
