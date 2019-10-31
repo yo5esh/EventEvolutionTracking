@@ -220,7 +220,6 @@ class PostNetwork:
                 break
         return
         
-    
     def updateConns(self, newPost):
         similarity_for_jac = defaultdict(lambda : 0)
         similarity_for_pot = defaultdict(lambda : 0)
