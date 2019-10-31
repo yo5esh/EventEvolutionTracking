@@ -316,6 +316,10 @@ class PostNetwork:
         print('Cores: ',[x.id for x in self.corePosts])
         print('B: ',[x.id for x in self.borderPosts])
         print('N: ',[x.id for x in self.noise])
+        k = Counter(self.entityDict)
+        high = k.most_common(10)
+        for i in high: 
+            print(i[0]," :",i[1]," ")
         print('********************************************************')
 
 
