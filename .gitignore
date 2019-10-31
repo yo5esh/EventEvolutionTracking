@@ -1,6 +1,6 @@
 Taggers/
 crisisNLP_word2vec_model/
-!Datasets/PreprocessedData/
+!Datasets/PreprocessedData/AllEvents.csv
 Datasets/
 *.zip
 *.tar.*

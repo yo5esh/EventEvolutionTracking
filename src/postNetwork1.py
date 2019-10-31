@@ -101,8 +101,8 @@ class PostNetwork:
                     self.noise.remove(neiPost)
                     self.borderPosts.append(neiPost)
                     neiPost.type = 'Border'
-        self.corePosts += S_n
-        self.corePosts += S_pl
+        self.corePosts += self.Sn
+        self.corePosts += self.S_pl
         clus = self.S0+self.S_
         neg_C = set()
         for post in clus :
@@ -126,7 +126,7 @@ class PostNetwork:
             post = S_temp.pop()
             connected.append(post)
             q = queue.Queue()
-            q.add(post)
+            q.put(post)
             explore[post] = False
             while (not(q.empty())) :
                 post = q.get()
@@ -170,7 +170,7 @@ class PostNetwork:
                     clusters[oldCid].clear()
         self.Sn.clear()
         self.S0.clear()
-        #self.printStats()
+        self.printStats()
         self.currTime += TIME_STEP
 
     def startTimeStep(self):
