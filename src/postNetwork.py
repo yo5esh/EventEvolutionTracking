@@ -6,24 +6,23 @@ import pandas as pd
 import numpy as np
 import queue
 
-epsilon0 = 0.055
-epsilon1 = 0.07
+epsilon0 = 0.9
+epsilon1 = 0.95
 delta1 = 0.08
 NEXT_POST_ID = 0
 NEXT_CLUSTER_ID = 0
-SLIDING_WINDOW = 1000000
-TIME_STEP = 540000
+SLIDING_WINDOW = 86400
+TIME_STEP = 3600
 LAMBDA = 200 # Without this we encounter overflow in fad_sim function
+datetimeFormat = '%Y-%m-%d %H:%M:%S'
 
 potential_neigh_thres = 0.05
 
 def fad_sim(a,b):
-    '''datetimeFormat = '%S'
     a = str(a)
     b = str(b)
     diff = datetime.datetime.strptime(a, datetimeFormat)-datetime.datetime.strptime(b, datetimeFormat)
-    return diff.seconds'''
-    return np.exp(abs(a-b)/(1000.0*LAMBDA))
+    return diff.seconds+1 # Shldn't be zero
 
 class Post:
 
@@ -215,7 +214,6 @@ class PostNetwork:
             for posts in self.entityDict[word.lower()]:
                 similarity_for_pot[posts] += 1/(len(self.entityDict[word.lower()])+1)
                 similarity_for_jac[posts] += 1
-                                        
         for prevPost in similarity_for_pot.keys():
             if(similarity_for_pot[prevPost] > potential_neigh_thres):
                 #sim = similarity_for_jac[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity_for_jac[prevPost])
@@ -244,7 +242,7 @@ class PostNetwork:
                 prevPost.type = 'Core'
                 self.S_pl.append(prevPost)
                 for neighbour,we in self.graph[prevPost] :
-                    if neighbour.type == 'Noise'
+                    if neighbour.type == 'Noise':
                         self.noise.remove(neighbour)
                         neighbour.type = 'Border'
                         self.borderPosts.append(neighbour)
@@ -307,22 +305,22 @@ class PostNetwork:
 
 
 postGraph = PostNetwork()
-df = pd.read_csv('../Datasets/PreprocessedData/2014_ebola_cf.csv', error_bad_lines=False, sep='\t')
+df = pd.read_csv('../Datasets/PreprocessedData/AllEvents.csv', error_bad_lines=False, sep='\t')
 
 for index, row in df.iterrows():
     print(index,row['filt_tweet_text'].split(' '))
     if index > 20:
         break
     if index == 0:
-        postGraph.currTime = int(row['tweet_timeStamp'])
-    if row['tweet_timeStamp'] <= postGraph.currTime + TIME_STEP:
-        postGraph.addPost(Post(entities=row['filt_tweet_text'].split(' '), timeStamp=row['tweet_timeStamp']))
+        postGraph.currTime = datetime.datetime.strptime(row['created_at'], datetimeFormat) + timedelta(seconds=1)
+    if datetime.datetime.strptime(row['created_at'], datetimeFormat) <= postGraph.currTime + timedelta(seconds=TIME_STEP):
+        postGraph.addPost(Post(entities=row['filt_tweet_text'].split(' '), timeStamp=row['created_at']))
     else:
         postGraph.endTimeStep() # Process new posts till now
         postGraph.startTimeStep() # Start adding new posts
-        postGraph.addPost(Post(entities=row['filt_tweet_text'].split(' '), timeStamp=row['tweet_timeStamp']))
+        postGraph.addPost(Post(entities=row['filt_tweet_text'].split(' '), timeStamp=row['created_at']))
     if NEXT_POST_ID%50 == 0:
         print(f'Processed {NEXT_POST_ID} posts')
-        print(row['tweet_timeStamp'], postGraph.currTime + TIME_STEP, row['tweet_timeStamp'] <= postGraph.currTime + TIME_STEP, sep='\n')
+        print(row['created_at'], postGraph.currTime + TIME_STEP, row['created_at'] <= postGraph.currTime + TIME_STEP, sep='\n')
 
 
