@@ -12,7 +12,7 @@ delta1 = 0.08
 NEXT_POST_ID = 0
 NEXT_CLUSTER_ID = 0
 SLIDING_WINDOW = 86400
-TIME_STEP = 3600
+TIME_STEP = 30
 LAMBDA = 200 # Without this we encounter overflow in fad_sim function
 datetimeFormat = '%Y-%m-%d %H:%M:%S'
 
@@ -174,7 +174,7 @@ class PostNetwork:
         self.Sn.clear()
         self.S0.clear()
         #self.printStats()
-        self.currTime += TIME_STEP
+        self.currTime += timedelta(seconds=TIME_STEP)
 
     def startTimeStep(self):
         # Delete old posts from self.posts and update weights, store in other array
@@ -215,6 +215,7 @@ class PostNetwork:
                 similarity_for_pot[posts] += 1/(len(self.entityDict[word.lower()])+1)
                 similarity_for_jac[posts] += 1
         for prevPost in similarity_for_pot.keys():
+            sim = 0
             if(similarity_for_pot[prevPost] > potential_neigh_thres):
                 #sim = similarity_for_jac[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity_for_jac[prevPost])
                 tfidf1 = []
@@ -309,7 +310,7 @@ df = pd.read_csv('../Datasets/PreprocessedData/AllEvents.csv', error_bad_lines=F
 
 for index, row in df.iterrows():
     print(index,row['filt_tweet_text'].split(' '))
-    if index > 20:
+    if index > 2000:
         break
     if index == 0:
         postGraph.currTime = datetime.datetime.strptime(row['created_at'], datetimeFormat) + timedelta(seconds=1)
@@ -321,6 +322,6 @@ for index, row in df.iterrows():
         postGraph.addPost(Post(entities=row['filt_tweet_text'].split(' '), timeStamp=row['created_at']))
     if NEXT_POST_ID%50 == 0:
         print(f'Processed {NEXT_POST_ID} posts')
-        print(row['created_at'], postGraph.currTime + TIME_STEP, row['created_at'] <= postGraph.currTime + TIME_STEP, sep='\n')
+        print(row['created_at'], postGraph.currTime + timedelta(seconds=TIME_STEP), datetime.datetime.strptime(row['created_at'], datetimeFormat) <= postGraph.currTime + timedelta(seconds=TIME_STEP), sep='\n')
 
 
