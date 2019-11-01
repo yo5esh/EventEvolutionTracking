@@ -56,6 +56,20 @@ class PostNetwork:
         self.Sn = list()
         self.S_, self.S_pl = list(),list()
         self.currTime = 0
+        self.trend = defaultdict(int)
+        
+        
+    def addToTrend(self,noun):
+        if len(self.trend) < 10:
+            self.trend[noun.lower()] = len(self.entityDict[noun.lower])
+        else:
+            if noun.lower in self.trend.keys():
+                self.trend[noun.lower()] = len(self.entityDict[noun.lower])
+            else:
+                key_min = min(self.trend.keys(), key=(lambda k: self.trend[k]))
+                if self.trend[key_min] < len(self.entityDict[noun.lower]):
+                    del self.trend[key_min]
+                    self.trend[noun.lower()] = len(self.entityDict[noun.lower])
 
 
     def addPost(self, post):
@@ -205,7 +219,7 @@ class PostNetwork:
             else:
                 break
         return
-        
+    
     
     def updateConns(self, newPost):
         similarity_for_jac = defaultdict(lambda : 0)
@@ -294,6 +308,7 @@ class PostNetwork:
             self.clusters[NEXT_CLUSTER_ID] = cluster
             NEXT_CLUSTER_ID += 1
         self.clusters.pop(delClustId, None)
+        
     
     def printStats(self):
         print('********************************************************')
@@ -302,6 +317,10 @@ class PostNetwork:
         print('Cores: ',[x.id for x in self.corePosts])
         print('B: ',[x.id for x in self.borderPosts])
         print('N: ',[x.id for x in self.noise])
+        k = Counter(self.entityDict)
+        high = k.most_common(10)
+        for i in high: 
+            print(i[0]," :",i[1]," ")
         print('********************************************************')
 
 
