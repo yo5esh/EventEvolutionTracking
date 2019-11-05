@@ -326,6 +326,24 @@ class PostNetwork:
         high = k.most_common(10)
         for i in high: 
             print(i[0]," :",i[1]," ")
+        top_most = defaultdict(int)
+        avg_for_all_clus = 0
+        for clus in self.clusters.values():
+            for post in clus:
+                for entity in post.entities():
+                    if entity in top_most.keys():
+                        top_most[entity] += 1
+                    else:
+                        top_most[entity] = 1
+            tot = 0        
+            k = Counter(top_most)
+            high = k.most_common(5)
+            for i in high:
+                tot += i[1]
+            tot = tot/(len(clus)*5)
+            avg_for_all_clus += tot
+        avg_for_all_clus = avg_for_all_clus/len(self.clusters)
+        print('Purity for all clusters ',avg_for_all_clus)    
         print('********************************************************')
 
 
