@@ -94,6 +94,9 @@ class PostNetwork:
         global NEXT_CLUSTER_ID, TIME_STEP, delta1
         ########## S0 and Sn only have core posts
         ## core->noncore posts due to change in time
+        for post in self.S_ :
+            if post.type == 'Core' :
+                self.S_.remove(post)
         for post in self.corePosts :
             if post.weight/fad_sim(self.currTime,post.timeStamp) < delta1 :
                 self.S_.append(post)
@@ -121,17 +124,19 @@ class PostNetwork:
         self.corePosts += self.Sn
         self.corePosts += self.S_pl
         clus = self.S0+self.S_
-        neg_C = set()
-        for post in clus :
-            for neiPost,we in self.graph[post]:
-                if neiPost.type == 'Core' and we >= epsilon1 and len(neiPost.clusId):# Should we check if conn is core conn also?
-                    neg_C.add(next(iter(neiPost.clusId)))# Gives element from a set
-        '''if len(neg_C) == 0:
-            return
-        elif len(neg_C) == 1:
-            return
-        else:
-            return'''
+        # neg_C = set()
+        # for post in clus :
+        #     for neiPost,we in self.graph[post]:
+        #         if neiPost.type == 'Core' and we >= epsilon1 and len(neiPost.clusId):# Should we check if conn is core conn also?
+        #             neg_C.add(next(iter(neiPost.clusId)))# Gives element from a set
+        # '''if len(neg_C) == 0:
+        #     return
+        # elif len(neg_C) == 1:
+        #     return
+        # else:
+        #     return'''
+        for post in clus:
+            self.nc_p0(post)
         
         pos_C = set()
         S_temp = set(self.Sn+self.S_pl)
@@ -196,14 +201,14 @@ class PostNetwork:
             if fad_sim(self.currTime,post.timeStamp) > SLIDING_WINDOW:
                 print('Removing ',post.id)
                 for neiPost,we in self.graph[post]:
+                    self.graph[neiPost].remove((post,we))
+                for neiPost,we in self.graph[post]:
                     neiPost.weight -= we                            ## core to non core can be checked here itself
                     if neiPost.type == 'Core' and neiPost.weight/fad_sim(self.currTime,neiPost.timeStamp) < delta1 :
                         neiPost.type = 'Noise'
                         self.noise.append(neiPost)
                         self.corePosts.remove(neiPost)
                         self.S_.append(neiPost)
-                        self.nc_p0(neiPost)
-                    self.graph[neiPost].remove((post,we))
                 del self.graph[post]
                 if(post.type == 'Core'): 
                     self.corePosts.remove(post)
