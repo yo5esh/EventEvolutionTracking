@@ -112,10 +112,11 @@ class PostNetwork:
                         for clus in neiPost.clusId :
                             self.clusters[clus].remove(neiPost)
                         neiPost.clusId.clear()
-            if 'Core' in [x.type for x,_ in self.graph[post]] and post.type != 'Border':
+            if post.type == 'Noise' and 'Core' in [x.type for x,_ in self.graph[post]] :
                 post.type = 'Border'
                 self.borderPosts.append(post)
                 self.noise.remove(post)
+
         for post in self.S_pl+self.Sn :
             for neiPost,_ in self.graph[post] :
                 if neiPost.type == 'Noise' :
