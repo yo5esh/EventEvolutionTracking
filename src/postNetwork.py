@@ -138,6 +138,12 @@ class PostNetwork:
         for post in clus:
             self.nc_p0(post)
         for post in self.S0 :
+            for neighbour,_ in self.graph[post] :
+                if neighbour.type == 'Border' and not 'Core' in [x.type for x,_ in self.graph[neighbour]]:
+                    # Shouldn't be a borderpost
+                    self.borderPosts.remove(neighbour)
+                    neighbour.type = 'Noise'
+                    self.noise.append(neighbour)
             del post
         pos_C = set()
         S_temp = set(self.Sn+self.S_pl)
@@ -221,7 +227,9 @@ class PostNetwork:
                 self.posts.remove(post)
                 for clus in post.clusId :
                     self.clusters[clus].remove(post)
-                if not(post.type == 'Core') :
+                for word in post.entities :
+                    self.entityDict[word.lower()].remove(post)
+                if not(post.type == 'Core')
                     del post
             else:
                 break
@@ -268,7 +276,7 @@ class PostNetwork:
                         self.noise.remove(neighbour)
                         neighbour.type = 'Border'
                         self.borderPosts.append(neighbour)
-            if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0:
+            if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0 :
                 print('Conn bw ',newPost.id,' ',prevPost.id)
                 self.graph[newPost].append((prevPost,sim))
                 self.graph[prevPost].append((newPost,sim))
