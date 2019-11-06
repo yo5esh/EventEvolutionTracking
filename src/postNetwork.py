@@ -23,7 +23,7 @@ def fad_sim(a,b):
     a = str(a)
     b = str(b)
     diff = datetime.datetime.strptime(a, datetimeFormat)-datetime.datetime.strptime(b, datetimeFormat)
-    return diff.seconds+1 # Shldn't be zero
+    return np.exp(diff.seconds) # Shldn't be zero
 
 class Post:
 
@@ -204,11 +204,11 @@ class PostNetwork:
                     for post in self.clusters[oldCid] :
                         post.clusId.remove(oldCid)
                         post.clusId.add(cid)
-                    clusters[cid] = clusters[cid].union(clusters[oldCid])
-                    clusters[oldCid].clear()
+                    self.clusters[cid] = self.clusters[cid].union(self.clusters[oldCid])
+                    self.clusters[oldCid].clear()
         self.Sn.clear()
         self.S0.clear()
-        #self.printStats()
+        self.printStats()
         self.currTime += timedelta(seconds=TIME_STEP)
 
     def startTimeStep(self):
@@ -240,8 +240,9 @@ class PostNetwork:
                 self.posts.remove(post)
                 for clus in post.clusId :
                     self.clusters[clus].remove(post)
-                for word in post.entities :
-                    self.entityDict[word.lower()].remove(post)
+                for word in set(post.entities) :
+                    if word!='':
+                        self.entityDict[word.lower()].remove(post)
                 if not (post.type == 'Core') :
                     del post
             else:
@@ -257,7 +258,7 @@ class PostNetwork:
                 similarity_for_pot[posts] += 1/(len(self.entityDict[word.lower()])+1)
                 similarity_for_jac[posts] += 1
         for prevPost in similarity_for_pot.keys():
-            sim = 0
+            #sim = 0
             if(similarity_for_pot[prevPost] > potential_neigh_thres):
                 #sim = similarity_for_jac[prevPost]/(len(newPost.entities)+len(prevPost.entities)-similarity_for_jac[prevPost])
                 tfidf1 = []
@@ -278,21 +279,22 @@ class PostNetwork:
                 for i in range(len(tfidf1)):
                     count += tfidf1[i]*tfidf2[i]
                 sim = count/(mag1*mag2)
+                sim = sim/fad_sim(newPost.timeStamp,prevPost.timeStamp)
                 print('We bw ',newPost.id,' ',prevPost.id, ' is ',sim)
-            newPost.weight += sim
-            prevPost.weight += sim
-            if not(prevPost.type == 'Core') and prevPost.weight/fad_sim(self.currTime,prevPost.timeStamp) >= delta1:
-                prevPost.type = 'Core'
-                self.S_pl.append(prevPost)
-                for neighbour,we in self.graph[prevPost] :
-                    if neighbour.type == 'Noise':
-                        self.noise.remove(neighbour)
-                        neighbour.type = 'Border'
-                        self.borderPosts.append(neighbour)
-            if sim/fad_sim(newPost.timeStamp,prevPost.timeStamp) > epsilon0 :
-                print('Conn bw ',newPost.id,' ',prevPost.id)
-                self.graph[newPost].append((prevPost,sim))
-                self.graph[prevPost].append((newPost,sim))
+                newPost.weight += sim
+                prevPost.weight += sim
+                if not(prevPost.type == 'Core') and prevPost.weight/fad_sim(self.currTime,prevPost.timeStamp) >= delta1:
+                    prevPost.type = 'Core'
+                    self.S_pl.append(prevPost)
+                    for neighbour,we in self.graph[prevPost] :
+                        if neighbour.type == 'Noise':
+                            self.noise.remove(neighbour)
+                            neighbour.type = 'Border'
+                            self.borderPosts.append(neighbour)
+                if sim > epsilon0 :
+                    print('Conn bw ',newPost.id,' ',prevPost.id)
+                    self.graph[newPost].append((prevPost,sim))
+                    self.graph[prevPost].append((newPost,sim))
             
         if newPost.weight/fad_sim(self.currTime,newPost.timeStamp) >= delta1:
             self.Sn.append(newPost)
@@ -318,7 +320,7 @@ class PostNetwork:
         if delPost.type == 'Core' :
             clus_posts.remove(delPost)
         q = queue.Queue()
-        explore = dict()
+        explore = defaultdict(lambda:False)
         for post in clus_posts:
             explore[post] = True
         explore[delPost] = False
@@ -346,18 +348,18 @@ class PostNetwork:
         print('********************************************************')
         print(self.currTime)
         print('No. of clusters: ',len(self.clusters))
-        print('Cores: ',[x.id for x in self.corePosts])
-        print('B: ',[x.id for x in self.borderPosts])
-        print('N: ',[x.id for x in self.noise])
-        k = Counter(self.entityDict)
-        high = k.most_common(10)
-        for i in high: 
-            print(i[0]," :",i[1]," ")
+        # print('Cores: ',[x.id for x in self.corePosts])
+        # print('B: ',[x.id for x in self.borderPosts])
+        # print('N: ',[x.id for x in self.noise])
+        #k = Counter(self.entityDict)
+        #high = k.most_common(1)
+        #for i in high: 
+        #    print(i[0]," :",i[1]," ")
         top_most = defaultdict(int)
         avg_for_all_clus = 0
         for clus in self.clusters.values():
             for post in clus:
-                for entity in post.entities():
+                for entity in post.entities:
                     if entity in top_most.keys():
                         top_most[entity] += 1
                     else:
@@ -379,8 +381,6 @@ df = pd.read_csv('../Datasets/PreprocessedData/AllEvents.csv', error_bad_lines=F
 
 for index, row in df.iterrows():
     print(index,row['filt_tweet_text'].split(' '))
-    if index > 2000:
-        break
     if index == 0:
         postGraph.currTime = datetime.datetime.strptime(row['created_at'], datetimeFormat) + timedelta(seconds=1)
     if datetime.datetime.strptime(row['created_at'], datetimeFormat) <= postGraph.currTime + timedelta(seconds=TIME_STEP):
