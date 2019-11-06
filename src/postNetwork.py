@@ -53,7 +53,6 @@ class PostNetwork:
         self.graph = defaultdict(list)
         self.sketchGraph = defaultdict(list)
         self.clusters = defaultdict(set)
-        self.S0 = list()
         self.Sn = list()
         self.S_, self.S_pl = list(),list()
         self.currTime = 0
@@ -102,7 +101,8 @@ class PostNetwork:
             if post.weight/fad_sim(self.currTime,post.timeStamp) < delta1 :
                 self.S_.append(post)
         ## Check for new border posts
-        for post in self.S_:
+        clus = set(self.S_)
+        for post in clus:
             for neiPost,_ in self.graph[post]:
                 if neiPost.type == 'Border':
                     if not 'Core' in [x.type for x,_ in self.graph[neiPost]]:
@@ -117,7 +117,6 @@ class PostNetwork:
                 post.type = 'Border'
                 self.borderPosts.append(post)
                 self.noise.remove(post)
-
         for post in self.S_pl+self.Sn :
             for neiPost,_ in self.graph[post] :
                 if neiPost.type == 'Noise' :
@@ -126,9 +125,7 @@ class PostNetwork:
                     self.noise.remove(neiPost)
                     self.borderPosts.append(neiPost)
                     neiPost.type = 'Border'
-        self.corePosts += self.Sn
-        self.corePosts += self.S_pl
-        clus = set(self.S0+self.S_)
+        self.corePosts += self.Sn + self.S_pl
         # neg_C = set()
         # for post in clus :
         #     for neiPost,we in self.graph[post]:
@@ -142,14 +139,6 @@ class PostNetwork:
         #     return'''
         for post in clus :
             self.nc_p0(post)
-        for post in self.S0 :
-            for neighbour,_ in self.graph[post] :
-                if neighbour.type == 'Border' and not 'Core' in [x.type for x,_ in self.graph[neighbour]]:
-                    # Shouldn't be a borderpost
-                    self.borderPosts.remove(neighbour)
-                    neighbour.type = 'Noise'
-                    self.noise.append(neighbour)
-            del post
         pos_C = set()
         S_temp = set(self.Sn+self.S_pl)
         explore = dict()
@@ -207,7 +196,6 @@ class PostNetwork:
                     self.clusters[cid] = self.clusters[cid].union(self.clusters[oldCid])
                     self.clusters[oldCid].clear()
         self.Sn.clear()
-        self.S0.clear()
         self.printStats()
         self.currTime += timedelta(seconds=TIME_STEP)
 
@@ -228,12 +216,15 @@ class PostNetwork:
                 del self.graph[post]
                 if(post.type == 'Core'): 
                     self.corePosts.remove(post)
-                    self.S0.append(post)
                     post.type = 'Noise'
-                    self.noise.append(post)
+                    nc_p0(post)
+                    for neighbour,_ in self.graph[neighbour] :
+                        if neighbour.type == 'Border' and not 'Core' in [x.type for x,_ in self.graph[neighbour]]:
+                            # Shouldn't be a borderpost
+                            self.borderPosts.remove(neighbour)
+                            neighbour.type = 'Noise'
+                            self.noise.append(neighbour)
                 elif(post.type == 'Border'): 
-                    for clus in post.clusId :
-                        self.clusters[clus].remove(post)
                     self.borderPosts.remove(post)
                 else : 
                     self.noise.remove(post)
@@ -243,8 +234,7 @@ class PostNetwork:
                 for word in set(post.entities) :
                     if word != '' :
                         self.entityDict[word.lower()].remove(post)
-                if not (post.type == 'Core') :
-                    del post
+                del post
             else:
                 break
         return
@@ -320,13 +310,10 @@ class PostNetwork:
             if post.type == 'Core' :
                 clus_posts.append(post)
             post.clusId.remove(delClustId)
-        if delPost.type == 'Core' :
-            clus_posts.remove(delPost)
         q = queue.Queue()
         explore = dict()
         for post in clus_posts:
             explore[post.id] = True
-        explore[delPost.id] = False
         while (len(clus_posts)) :
             cluster = set()
             cluster.add(clus_posts[0])
@@ -345,6 +332,7 @@ class PostNetwork:
                             clus_posts.remove(neighbour)
                     else :
                         cluster.add(neighbour)
+                        neighbour.clusId.add(NEXT_CLUSTER_ID)
             self.clusters[NEXT_CLUSTER_ID] = cluster
             NEXT_CLUSTER_ID += 1
         self.clusters.pop(delClustId, None)
