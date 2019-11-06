@@ -215,7 +215,6 @@ class PostNetwork:
                     self.S0.append(post)
                     post.type = 'Noise'
                     self.noise.append(post)
-                    self.nc_p0(post)
                 elif(post.type == 'Border'): self.borderPosts.remove(post)
                 else : self.noise.remove(post)
                 self.posts.remove(post)
