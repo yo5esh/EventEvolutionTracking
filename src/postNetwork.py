@@ -152,7 +152,7 @@ class PostNetwork:
             del post
         pos_C = set()
         S_temp = set(self.Sn+self.S_pl)
-        explore = dict()
+        explore = defaultdict(lambda:False)
         for post in S_temp :
             explore[post.id] = True
         while len(S_temp) :
@@ -323,7 +323,7 @@ class PostNetwork:
         if delPost.type == 'Core' :
             clus_posts.remove(delPost)
         q = queue.Queue()
-        explore = dict()
+        explore = defaultdict(lambda:False)
         for post in clus_posts:
             explore[post.id] = True
         explore[delPost.id] = False
