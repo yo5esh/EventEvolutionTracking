@@ -137,7 +137,8 @@ class PostNetwork:
         #     return'''
         for post in clus:
             self.nc_p0(post)
-        
+        for post in self.S0 :
+            del post
         pos_C = set()
         S_temp = set(self.Sn+self.S_pl)
         explore = dict()
@@ -220,6 +221,8 @@ class PostNetwork:
                 self.posts.remove(post)
                 for clus in post.clusId :
                     self.clusters[clus].remove(post)
+                if not(post.type == 'Core') :
+                    del post
             else:
                 break
         return
