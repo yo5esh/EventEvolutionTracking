@@ -109,6 +109,9 @@ class PostNetwork:
                         self.borderPosts.remove(neiPost)
                         neiPost.type = 'Noise'
                         self.noise.append(neiPost)
+                        for clus in neiPost.clusId :
+                            self.clusters[clus].remove(neiPost)
+                        neiPost.clusId.clear()
             if 'Core' in [x.type for x,_ in self.graph[post]] and post.type != 'Border':
                 post.type = 'Border'
                 self.borderPosts.append(post)
@@ -123,7 +126,7 @@ class PostNetwork:
                     neiPost.type = 'Border'
         self.corePosts += self.Sn
         self.corePosts += self.S_pl
-        clus = self.S0+self.S_
+        clus = set(self.S0+self.S_)
         # neg_C = set()
         # for post in clus :
         #     for neiPost,we in self.graph[post]:
@@ -162,7 +165,9 @@ class PostNetwork:
                 for neiPost,we in self.graph[post] :
                     if neiPost.type == 'Core' :
                         if len(neiPost.clusId) :
-                            pos_C.add(next(iter(neiPost.clusId)))
+                            a = neiPost.clusId.pop()
+                            pos_C.add(a)
+                            neiPost.clusId.add(a)
                         elif explore[neiPost] :
                             explore[neiPost] = False
                             q.put(neiPost)
@@ -181,15 +186,17 @@ class PostNetwork:
                 cid = pos_C.pop()
                 for post in connected :
                     for neiPost,we in self.graph[post]:
-                        self.clusters[cid].add(post)
+                        self.clusters[cid].add(neiPost)
                         neiPost.clusId.add(cid)
-                    post.clusId.add(cid)
+                    self.clusters[cid].add(post)
+                    post.clusId=set([cid])
             else:
                 cid = pos_C.pop()
                 for post in connected :
                     for neiPost,we in self.graph[post] :
                         self.clusters[cid].add(neiPost)
                         neiPost.clusId.add(cid)
+                    self.clusters[cid].add(post)
                     post.clusId = set([cid])
                 for oldCid in pos_C :
                     for post in self.clusters[oldCid] :
@@ -205,11 +212,11 @@ class PostNetwork:
     def startTimeStep(self):
         # Delete old posts from self.posts and update weights, store in other array
         for i,post in enumerate(self.posts):
-            if fad_sim(self.currTime,post.timeStamp) > SLIDING_WINDOW:
+            if fad_sim(self.currTime,post.timeStamp) > SLIDING_WINDOW :
                 print('Removing ',post.id)
                 for neiPost,we in self.graph[post]:
                     self.graph[neiPost].remove((post,we))
-                for neiPost,we in self.graph[post]:
+                for neiPost,we in self.graph[post] :
                     neiPost.weight -= we                            ## core to non core can be checked here itself
                     if neiPost.type == 'Core' and neiPost.weight/fad_sim(self.currTime,neiPost.timeStamp) < delta1 :
                         neiPost.type = 'Noise'
@@ -222,14 +229,18 @@ class PostNetwork:
                     self.S0.append(post)
                     post.type = 'Noise'
                     self.noise.append(post)
-                elif(post.type == 'Border'): self.borderPosts.remove(post)
-                else : self.noise.remove(post)
+                elif(post.type == 'Border'): 
+                    for clus in post.clusId :
+                        self.clusters[clus].remove(post)
+                    self.borderPosts.remove(post)
+                else : 
+                    self.noise.remove(post)
                 self.posts.remove(post)
                 for clus in post.clusId :
                     self.clusters[clus].remove(post)
                 for word in post.entities :
                     self.entityDict[word.lower()].remove(post)
-                if not(post.type == 'Core') :
+                if not (post.type == 'Core') :
                     del post
             else:
                 break
@@ -293,13 +304,17 @@ class PostNetwork:
                 self.borderPosts.append(newPost)
 
     def nc_p0(self, delPost):
+        global NEXT_CLUSTER_ID
         delClustId = delPost.clusId.pop()
+        delPost.clusId.add(delClustId)
         postsInCluster = self.clusters[delClustId]
         clus_posts = []
         for post in postsInCluster:
             if post.type == 'Core' :
                 clus_posts.append(post)
             post.clusId.remove(delClustId)
+        if delPost.type == 'Core' :
+            clus_posts.remove(delPost)
         q = queue.Queue()
         explore = dict()
         for post in clus_posts:
