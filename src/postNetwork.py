@@ -152,7 +152,7 @@ class PostNetwork:
             del post
         pos_C = set()
         S_temp = set(self.Sn+self.S_pl)
-        explore = dict()
+        explore = defaultdict(lambda:False)
         for post in S_temp :
             explore[post] = True
         while len(S_temp) :
