@@ -229,7 +229,7 @@ class PostNetwork:
                     self.clusters[clus].remove(post)
                 for word in post.entities :
                     self.entityDict[word.lower()].remove(post)
-                if not(post.type == 'Core')
+                if not(post.type == 'Core') :
                     del post
             else:
                 break
