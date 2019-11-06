@@ -362,7 +362,7 @@ class PostNetwork:
         avg_for_all_clus = 0
         for clus in self.clusters.values():
             for post in clus:
-                for entity in post.entities():
+                for entity in post.entities:
                     if entity in top_most.keys():
                         top_most[entity] += 1
                     else:
