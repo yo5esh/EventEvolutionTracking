@@ -52,7 +52,7 @@ class PostNetwork:
         self.entityDict = defaultdict(list)
         self.graph = defaultdict(list)
         self.sketchGraph = defaultdict(list)
-        self.clusters = defaultdict(set)
+        self.clusters = dict()
         self.Sn = list()
         self.S_, self.S_pl = list(),list()
         self.currTime = 0
@@ -195,6 +195,16 @@ class PostNetwork:
                         post.clusId.add(cid)
                     self.clusters[cid] = self.clusters[cid].union(self.clusters[oldCid])
                     self.clusters[oldCid].clear()
+                    del self.clusters[oldCid]
+                    print('#################################################################################')
+        intersect = set()
+        for id in self.clusters.keys() :
+            for post in self.clusters[id] :
+                if post.type == 'Core' :
+                    if post in intersect :
+                        print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+                    else :
+                        intersect.add(post)
         self.Sn.clear()
         self.printStats()
         self.currTime += timedelta(seconds=TIME_STEP)
@@ -226,11 +236,11 @@ class PostNetwork:
                             self.noise.append(neighbour)
                 elif(post.type == 'Border'): 
                     self.borderPosts.remove(post)
+                    for id in post.clusId:
+                        self.clusters[id].remove(post)
                 else : 
                     self.noise.remove(post)
                 self.posts.remove(post)
-                for clus in post.clusId :
-                    self.clusters[clus].remove(post)
                 for word in set(post.entities) :
                     if word != '' :
                         self.entityDict[word.lower()].remove(post)
@@ -270,7 +280,7 @@ class PostNetwork:
                     count += tfidf1[i]*tfidf2[i]
                 sim = count/(mag1*mag2)
                 sim/= fad_sim(newPost.timeStamp,prevPost.timeStamp)
-                print('We bw ',newPost.id,' ',prevPost.id, ' is ',sim)
+                #print('We bw ',newPost.id,' ',prevPost.id, ' is ',sim)
                 newPost.weight += sim
                 prevPost.weight += sim
                 if not(prevPost.type == 'Core') and prevPost.weight/fad_sim(self.currTime,prevPost.timeStamp) >= delta1:
@@ -333,15 +343,16 @@ class PostNetwork:
                     else :
                         cluster.add(neighbour)
                         neighbour.clusId.add(NEXT_CLUSTER_ID)
-            self.clusters[NEXT_CLUSTER_ID] = cluster
-            NEXT_CLUSTER_ID += 1
-        self.clusters.pop(delClustId, None)
-        
+            if len(cluster) > 0:
+                self.clusters[NEXT_CLUSTER_ID] = cluster
+                NEXT_CLUSTER_ID += 1
+        #self.clusters.pop(delClustId, None)
+        del self.clusters[delClustId]
     
     def printStats(self):
         print('********************************************************')
         print(self.currTime)
-        print('No. of clusters: ',len(self.clusters))
+        print('No. of clusters: ',len(self.clusters.keys()))
         #print('Cores: ',[x.id for x in self.corePosts])
         #print('B: ',[x.id for x in self.borderPosts])
         #print('N: ',[x.id for x in self.noise])
@@ -349,11 +360,12 @@ class PostNetwork:
         #high = k.most_common(10)
         #for i in high: 
         #    print(i[0]," :",i[1]," ")
-        top_most = defaultdict(int)
+        #top_most = defaultdict(int)
         avg_for_all_clus = 0
         for clus in self.clusters.values():
+            top_most = defaultdict(int)
             for post in clus:
-                for entity in post.entities:
+                for entity in set(post.entities):
                     if entity in top_most.keys():
                         top_most[entity] += 1
                     else:
@@ -365,8 +377,10 @@ class PostNetwork:
                 tot += i[1]
             tot = tot/(len(clus)*5)
             avg_for_all_clus += tot
+            del top_most
         avg_for_all_clus = avg_for_all_clus/len(self.clusters)
-        print('Purity for all clusters ',avg_for_all_clus)    
+        print('Purity for all clusters ',avg_for_all_clus)
+        #print (self.clusters) 
         print('********************************************************')
 
 
@@ -374,8 +388,8 @@ postGraph = PostNetwork()
 df = pd.read_csv('../Datasets/PreprocessedData/AllEvents.csv', error_bad_lines=False, sep='\t')
 
 for index, row in df.iterrows():
-    print(index,row['filt_tweet_text'].split(' '))
-    if index > 20000:
+    #print(index,row['filt_tweet_text'].split(' '))
+    if index > 1400:
         break
     if index == 0:
         postGraph.currTime = datetime.datetime.strptime(row['created_at'], datetimeFormat) + timedelta(seconds=1)
