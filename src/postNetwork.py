@@ -7,7 +7,7 @@ import numpy as np
 import queue
 from collections import Counter
 
-epsilon0 = 0.9
+epsilon0 = 0.09
 epsilon1 = 0.95
 delta1 = 0.08
 NEXT_POST_ID = 0
@@ -71,6 +71,35 @@ class PostNetwork:
                     del self.trend[key_min]
                     self.trend[noun.lower()] = len(self.entityDict[noun.lower])
 
+    def check_clus(self):
+        for post in self.corePosts:
+            if len(post.clusId) != 1:
+                print('################## Core post not in one cluster')
+            cid = post.clusId.pop()
+            post.clusId.add(cid)
+            if post not in self.clusters[cid]:
+                print('################## core post didnt get added in cluster')
+        for post in self.borderPosts:
+            for neipost,_ in self.graph[post]:
+                if neipost.type == 'Core':
+                    if next(iter(neipost.clusId)) not in post.clusId:
+                        print('########################### Border 1')
+            for cid in post.clusId:
+                if post not in self.clusters[cid]:
+                    print('###################################################  Border2')
+
+        for post in self.noise:
+            if len(post.clusId) != 0:
+                print('############################################################# Noise')    
+
+        for clus in self.clusters.values():
+            for post in clus:
+                if fad_sim(self.currTime,post.timeStamp) > SLIDING_WINDOW:
+                    print('####################################################################### Error3') 
+                if post.type == 'Noise':
+                    print('##################################################  Noise in clus')
+
+
 
     def addPost(self, post):
         if not isinstance(post, Post):
@@ -96,7 +125,7 @@ class PostNetwork:
         ## core->noncore posts due to change in time
         for post in self.S_ :
             if post.type == 'Core' :
-                self.S_.remove(post)
+                print('=======================================================================================================================================================================================================')
         for post in self.corePosts :
             if post.weight/fad_sim(self.currTime,post.timeStamp) < delta1 :
                 self.S_.append(post)
@@ -125,7 +154,10 @@ class PostNetwork:
                     self.noise.remove(neiPost)
                     self.borderPosts.append(neiPost)
                     neiPost.type = 'Border'
-        self.corePosts += self.Sn + self.S_pl
+        for post in self.S_pl:
+            for id in post.clusId :
+                self.clusters[id].remove(post)
+            post.clusId.clear()
         # neg_C = set()
         # for post in clus :
         #     for neiPost,we in self.graph[post]:
@@ -139,12 +171,12 @@ class PostNetwork:
         #     return'''
         for post in clus :
             self.nc_p0(post)
-        pos_C = set()
         S_temp = set(self.Sn+self.S_pl)
         explore = dict()
         for post in S_temp :
             explore[post.id] = True
         while len(S_temp) :
+            pos_C = set()
             connected = list()
             post = S_temp.pop()
             connected.append(post)
@@ -196,16 +228,10 @@ class PostNetwork:
                     self.clusters[cid] = self.clusters[cid].union(self.clusters[oldCid])
                     self.clusters[oldCid].clear()
                     del self.clusters[oldCid]
-                    print('#################################################################################')
-        intersect = set()
-        for id in self.clusters.keys() :
-            for post in self.clusters[id] :
-                if post.type == 'Core' :
-                    if post in intersect :
-                        print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-                    else :
-                        intersect.add(post)
+                    #print('#################################################################################')
         self.Sn.clear()
+        self.S_.clear()
+        self.S_pl.clear()
         self.printStats()
         self.currTime += timedelta(seconds=TIME_STEP)
 
@@ -223,27 +249,31 @@ class PostNetwork:
                         self.noise.append(neiPost)
                         self.corePosts.remove(neiPost)
                         self.S_.append(neiPost)
-                del self.graph[post]
                 if(post.type == 'Core'): 
                     self.corePosts.remove(post)
                     post.type = 'Noise'
                     nc_p0(post)
-                    for neighbour,_ in self.graph[neighbour] :
+                    for neighbour,_ in self.graph[post] :
                         if neighbour.type == 'Border' and not 'Core' in [x.type for x,_ in self.graph[neighbour]]:
                             # Shouldn't be a borderpost
                             self.borderPosts.remove(neighbour)
                             neighbour.type = 'Noise'
                             self.noise.append(neighbour)
+                            for clus in neighbour.clusId :
+                                self.clusters[clus].remove(neighbour)
+                            neighbour.clusId.clear()
                 elif(post.type == 'Border'): 
                     self.borderPosts.remove(post)
                     for id in post.clusId:
                         self.clusters[id].remove(post)
+                    post.clusId.clear()
                 else : 
                     self.noise.remove(post)
                 self.posts.remove(post)
                 for word in set(post.entities) :
                     if word != '' :
                         self.entityDict[word.lower()].remove(post)
+                del self.graph[post]
                 del post
             else:
                 break
@@ -284,18 +314,21 @@ class PostNetwork:
                 newPost.weight += sim
                 prevPost.weight += sim
                 if not(prevPost.type == 'Core') and prevPost.weight/fad_sim(self.currTime,prevPost.timeStamp) >= delta1:
+                    if prevPost.type == 'Border': self.borderPosts.remove(prevPost)
+                    if prevPost.type == 'Noise': self.noise.remove(prevPost)
                     prevPost.type = 'Core'
-                    self.S_pl.append(prevPost)
-                    for id in prevPost.clusId :
-                        self.clusters[id].remove(prevPost)
-                    prevPost.clusId.clear()
+                    self.corePosts.append(prevPost)
+                    if prevPost not in self.S_:
+                        self.S_pl.append(prevPost)
+                    else:
+                        self.S_.remove(prevPost)
                     for neighbour,we in self.graph[prevPost] :
                         if neighbour.type == 'Noise':
                             self.noise.remove(neighbour)
                             neighbour.type = 'Border'
                             self.borderPosts.append(neighbour)
                 if sim > epsilon0 :
-                    print('Conn bw ',newPost.id,' ',prevPost.id)
+                    #print('Conn bw ',newPost.id,' ',prevPost.id)
                     self.graph[newPost].append((prevPost,sim))
                     self.graph[prevPost].append((newPost,sim))
             
@@ -351,6 +384,7 @@ class PostNetwork:
     
     def printStats(self):
         print('********************************************************')
+        self.check_clus()
         print(self.currTime)
         print('No. of clusters: ',len(self.clusters.keys()))
         #print('Cores: ',[x.id for x in self.corePosts])
@@ -389,7 +423,7 @@ df = pd.read_csv('../Datasets/PreprocessedData/AllEvents.csv', error_bad_lines=F
 
 for index, row in df.iterrows():
     #print(index,row['filt_tweet_text'].split(' '))
-    if index > 1400:
+    if index > 20000:
         break
     if index == 0:
         postGraph.currTime = datetime.datetime.strptime(row['created_at'], datetimeFormat) + timedelta(seconds=1)
